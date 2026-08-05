@@ -1,3 +1,17 @@
-\chapter{Memory}
+\chapter{Virtual Memory Architecture}
 
-This is the memory chapter.
+\section{Decoupled Metadata Management}
+
+Traditional monolithic operating systems allocate static arrays of page descriptors proportional to total physical RAM, resulting in significant memory overhead on high-capacity server systems. Telix addresses this by adapting the \emph{Morsel-Driven} allocation paradigm originally developed for high-throughput database query engines \footcite{kemp14}.
+
+Physical memory is partitioned into elastic, self-contained memory blocks ("morsels"). Instead of linear page descriptor lookup tables, translation mapping overhead is decoupled from address space size through software-managed inverted and clustered page tables \footcite{tall95, huck93}:
+
+\begin{equation}
+T_{\texttt{lookup}}(\texttt{VA}) = H(\texttt{VPN}) \pmod{N_{\texttt{buckets}}}
+\end{equation}
+
+Where $H(\texttt{VPN})$ is a hashed virtual page number mapping to a fixed-size bucket array, ensuring sublinear metadata bounds $O(M)$ where $M$ is the active working set rather than total physical capacity $P$.
+
+\section{Superpaging and Page Clustering}
+
+To minimize Translation Lookaside Buffer (TLB) misses, Telix uses transparent superpage allocation \footcite{nava02} backed by shared page table hierarchies across co-located threads \footcite{ko03}. Physical allocation utilizes page clustering algorithms derived from BSD VM extensions \footcite{baba79} and Linux kernel VM optimizations \footcite{dick01} to preserve contiguous physical memory pools.

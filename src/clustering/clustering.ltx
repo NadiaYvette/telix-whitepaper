@@ -1,3 +1,9 @@
-\chapter{Clustering}
+\chapter{Multikernel Partitioning and Subsystem Personalities}
 
-This is the clustering chapter.
+\section{Barrelfish Partitioning and Framekernel TCB}
+
+At the macro scale, hardware is split into independent microkernel nodes following the Barrelfish multikernel architecture \footcite{baum09}. Within each node, shared memory and memory safety are maintained using an Asterinas-style Framekernel written in Rust \footcite{peng24}, isolating hardware drivers and memory operations inside explicit safety domains.
+
+\section{Dynamic Personality Redirection}
+
+To support foreign operating system Binaries (such as Linux ELF or Windows PE executables), Telix incorporates dynamic system call redirection tables \footcite{gerb01}. Foreign OS ABIs run atop user-level microkernel applications \footcite{golu91} backed by distributed Mach-style cluster messaging \footcite{zajc93, rash87, milo93}.
