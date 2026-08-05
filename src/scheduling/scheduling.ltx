@@ -6,4 +6,4 @@ Telix decouples user-level thread scheduling from kernel-level dispatching using
 
 \section{Fair-Share and Co-Scheduling Mechanics}
 
-Preemptive task selection within a multikernel core domain is managed by an Earliest Eligible Virtual Deadline First (EEVDF) scheduler \footcite{stoi95}. For parallel workloads spanning multiple cores, Telix coordinate core scheduling using matrix gang scheduling techniques \footcite{oust82, feit92} to avoid lock-step waiting across parallel thread boundaries.
+Preemptive task selection within a multikernel core domain is managed by an Earliest Eligible Virtual Deadline First (EEVDF) scheduler \footcite{stoi95}. For parallel workloads spanning multiple cores, Telix coordinates core scheduling using matrix gang scheduling techniques \footcite{oust82, feit92} to avoid lock-step waiting across parallel thread boundaries.
