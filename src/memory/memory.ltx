@@ -1,17 +1,79 @@
 \chapter{Virtual Memory Architecture}
 
-\section{Decoupled Metadata Management}
+\section{Page Clustering}
 
-Traditional monolithic operating systems allocate static arrays of page descriptors proportional to total physical RAM, resulting in significant memory overhead on high-capacity server systems. Telix addresses this by adapting the \emph{Morsel-Driven} allocation paradigm originally developed for high-throughput database query engines \footcite{kemp14}.
+Page clustering divorces the minimum MMU/TLB mapping granularity $K$
+(for \foreignlanguage{german}{Körnung}) from the kernel allocation unit
+$M$ (for \foreignlanguage{german}{Maßeinheit}).
 
-Physical memory is partitioned into elastic, self-contained memory blocks ("morsels"). Instead of linear page descriptor lookup tables, translation mapping overhead is decoupled from address space size through software-managed inverted and clustered page tables \footcite{tall95, huck93}:
+\section{\texttt{LLFree}}
+
+Page sizes $\sigma$ (for \foreignlanguage{german}{Seitengröße}) tend to
+follow a pattern like
+\begin{equation}
+	\sigma_n = K\cdot 2^{W\cdot n}
+\end{equation}
+where $W$ is for \foreignlanguage{german}{Sprungweite}.
+\\
+The LLM GenAI Proof of Concept code for Telix demonstrated fully
+lockfree \texttt{LLFree} with in-band metadata.
+
+\section{Superpaging}
+
+For a superpage size $\sigma_n\geq M$, allocating via \texttt{LLFree}
+can provide pages of the size needed. Something beautiful happens when
+$\sigma_n<M$. A kernel allocation unit can be mapped out with the
+largest superpage sizes possible within the constraints of the virtual
+window and the allocation unit.
+
+
+
+% \section{Decoupled Metadata Management}
+\section{\emph{Morsels} for Very Large Superpages}
+
+Traditional monolithic operating systems allocate static arrays of page
+descriptors proportional to total physical RAM, resulting in
+significant memory overhead on high-capacity server systems. Telix
+addresses this by adapting the \emph{Morsel-Driven} allocation paradigm
+originally developed for high-throughput database query engines
+\footcite{kemp14}.
+
+Physical memory is partitioned into elastic, self-contained memory
+blocks ("morsels"). Instead of linear page descriptor lookup tables,
+translation mapping overhead is decoupled from address space size
+through software-managed inverted and clustered page tables
+\footcite{tall95, huck93}:
 
 \begin{equation}
 T_{\texttt{lookup}}(\texttt{VA}) = H(\texttt{VPN}) \pmod{N_{\texttt{buckets}}}
 \end{equation}
 
-Where $H(\texttt{VPN})$ is a hashed virtual page number mapping to a fixed-size bucket array, ensuring sublinear metadata bounds $O(M)$ where $M$ is the active working set rather than total physical capacity $P$.
+Where $H(\texttt{VPN})$ is a hashed virtual page number mapping to a
+fixed-size bucket array, ensuring sublinear metadata bounds $O(M)$ where
+$M$ is the active working set rather than total physical capacity $P$.
+\\
+Rik van Riel posted something akin to morsels to the Linux Kernel
+Mailing List. The idea was that 1 GiB or larger superpages would be
+treated as arenas for large-scale memory management with buddy bitmaps
+attached etc. and decisions like keeping them fully intact or only
+touched with movable memory could be made at that level.
 
 \section{Superpaging and Page Clustering}
 
-To minimize Translation Lookaside Buffer (TLB) misses, Telix uses transparent superpage allocation \footcite{nava02} backed by shared page table hierarchies across co-located threads \footcite{ko03}. Physical allocation utilizes page clustering algorithms derived from BSD VM extensions \footcite{baba79} and Linux kernel VM optimizations \footcite{dick01} to preserve contiguous physical memory pools.
+To minimize Translation Lookaside Buffer (TLB) misses, Telix uses
+transparent superpage allocation \footcite{nava02} backed by shared page
+table hierarchies across co-located threads \footcite{ko03}. Physical
+allocation utilizes page clustering algorithms derived from BSD VM
+extensions \footcite{baba79} and Linux kernel VM optimizations
+\footcite{dick01} to preserve contiguous physical memory pools.
+\\
+This text in this last section should likely be redistributed into
+earlier sections of the chapter.
+
+\section{Framekernels, Multikernels and Address Spaces}
+
+The relationships here should be clarified.
+
+\section{Effective Use of Inverted Pagetables}
+
+\section{Shared Pagetables}

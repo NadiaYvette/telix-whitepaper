@@ -2,8 +2,21 @@
 
 \section{M:N Threading via Scheduler Activations}
 
-Telix decouples user-level thread scheduling from kernel-level dispatching using $M:N$ Scheduler Activations \footcite{ande92}. The kernel notifies the user-level runtime of blocking events (e.g., page faults, I/O delays) via explicit upcalls, enabling user space to schedule another ready thread without losing CPU allocations.
+Telix decouples user-level thread scheduling from kernel-level
+dispatching using $M:N$ Scheduler Activations \footcite{ande92}. The
+kernel notifies the user-level runtime of blocking events (e.g., page
+faults, I/O delays) via explicit upcalls, enabling user space to
+schedule another ready thread without losing CPU allocations.
 
-\section{Fair-Share and Co-Scheduling Mechanics}
+\section{Fair-Share Mechanics}
 
-Preemptive task selection within a multikernel core domain is managed by an Earliest Eligible Virtual Deadline First (EEVDF) scheduler \footcite{stoi95}. For parallel workloads spanning multiple cores, Telix coordinates core scheduling using matrix gang scheduling techniques \footcite{oust82, feit92} to avoid lock-step waiting across parallel thread boundaries.
+Preemptive task selection within a multikernel core domain is managed by
+an Earliest Eligible Virtual Deadline First (EEVDF) scheduler
+\footcite{stoi95}.
+
+\section{Co-Scheduling Mechanics}
+
+For parallel workloads spanning multiple cores, Telix coordinates core
+scheduling using matrix gang scheduling techniques
+\footcite{oust82, feit92} to avoid lock-step waiting across parallel
+thread boundaries.

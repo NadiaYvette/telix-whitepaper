@@ -1,0 +1,24 @@
+\chapter{Verification and Architectural Security}
+
+\section{Barrelfish Partitioning}
+
+At the macro scale, hardware is split into independent microkernel nodes
+following the Barrelfish multikernel architecture \footcite{baum09}.
+
+\section{Framekernel TCB}
+Within each node, shared memory and memory safety are maintained using
+an Asterinas-style Framekernel written in Rust \footcite{peng24},
+isolating hardware drivers and memory operations inside explicit safety
+domains.
+
+\section{Formal Verification}
+
+\subsection{Sail Hardware Models}
+
+\subsection{Iris/RustBelt/RBrix and/or Katamaran}
+
+\subsection{VRM}
+
+\subsection{rmem}
+
+\subsection{CompCert}

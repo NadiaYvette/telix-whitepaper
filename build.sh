@@ -1,6 +1,6 @@
 #!/bin/sh
 
-TEXINPUTS=".:src:out:src/abstract:src/intro:src/clustering:src/memory:src/io:src/scheduling:${TEXINPUTS}"
+TEXINPUTS=".:src:out:src/abstract:src/intro:src/verification:src/control-plane:src/personality:src/clustering:src/memory:src/io:src/scheduling:${TEXINPUTS}"
 BIBINPUTS="./bib:~/src/bib:${BIBINPUTS}"
 LATEX=lualatex
 export LATEX TEXINPUTS BIBINPUTS

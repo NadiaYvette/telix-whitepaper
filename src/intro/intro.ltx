@@ -1,19 +1,66 @@
 \chapter{Introduction}
 
-Modern general-purpose operating systems face a fundamental tension between high scalability on many-core hardware and low-latency, formally verifiable security guarantees. Traditional monolithic designs suffer from lock contention, large Trusted Computing Bases (TCBs), and inflexible kernel-user boundaries.
+Modern general-purpose operating systems face a fundamental tension
+between high scalability on many-core hardware and low-latency, formally
+verifiable security guarantees. Traditional monolithic designs suffer
+from lock contention, large Trusted Computing Bases (TCBs), and
+inflexible kernel-user boundaries.
 
-The \textbf{Telix} operating system synthesizes foundational microkernel research, safe systems programming paradigms, and modern database memory management techniques to establish a scalable, general-purpose system architecture.
+The \textbf{Telix} operating system synthesizes foundational microkernel
+research, safe systems programming paradigms, and modern database memory
+management techniques to establish a scalable, general-purpose system
+architecture.
+
+\section{Motivations}
+
+I should come up with something to say here.
 
 \section{Core Architectural Principles}
 
-Telix synthesizes its architectural foundation around four primary domain goals:
+Telix synthesizes its architectural foundation around four primary
+domain goals:
 
 \begin{description}
-    \item[Hardware Partitioning and Safety Domain Isolation:] Systems are partitioned per the Barrelfish multikernel model \footfullcite{baum09} into decoupled message-passing nodes. Within each multikernel partition, shared-memory domains utilize the Asterinas Framekernel architecture \footfullcite{peng24} to enforce safe Rust-based intra-kernel privilege separation alongside formal verification principles derived from seL4 \footfullcite{klei09}.
+    \item[Formal Verification:] Formally verify via Coq/Rocq or other
+	    theorem provers.
 
-    \item[Metadata-Light Virtual Memory Management:] Virtual memory overhead is constrained to sublinear scaling relative to physical memory size. Telix combines superpaging \footfullcite{nava02}, shared page tables \footfullcite{ko03}, software-managed inverted page tables \footfullcite{tall95, huck93}, and BSD/Linux page clustering algorithms \footfullcite{baba79, dick01}. Additionally, traditional page descriptor arrays are eliminated by adapting main-memory database morsel-driven allocation \footfullcite{kemp14}.
+    \item[Hardware Partitioning and Safety Domain Isolation:] Systems
+	    are partitioned per the Barrelfish multikernel model
+	    \footfullcite{baum09} into decoupled message-passing nodes.
+	    Within each multikernel partition, shared-memory domains
+	    utilize the Asterinas Framekernel architecture
+	    \footfullcite{peng24} to enforce safe Rust-based
+	    intra-kernel privilege separation alongside formal
+	    verification principles derived from seL4
+	    \footfullcite{klei09}.
 
-    \item[Hybrid Workload Co-Scheduling:] Thread execution uses $M:N$ threading via Scheduler Activations \footfullcite{ande92} coupled with Earliest Eligible Virtual Deadline First (EEVDF) proportional allocation \footfullcite{stoi95} and parallel gang co-scheduling \footfullcite{oust82, feit92}.
+    \item[Hybrid Continuation-Passing and Network-Structured Control
+	    Plane:] For fully asynchronous operation with efficiency
+	    within shared memory domains while also cluster-ready by
+	    virtue of discipline maintained for IPC.
 
-    \item[Asynchronous Zero-Copy I/O and Compatibility:] Inter-process communication and system invocations rely on lock-free fast buffers (Fbufs) \footfullcite{drus93} and completion-driven queues \footfullcite{krie06, ande91}. Multiple binary compatibility interfaces (Linux, Windows) are supported through a dynamic personality redirection subsystem \footfullcite{gerb01, golu91, zajc93, rash87, milo93}.
+    \item[Metadata-Light Virtual Memory Management:] Virtual memory
+	    overhead is constrained to sublinear scaling relative to
+	    physical memory size. Telix combines superpaging
+	    \footfullcite{nava02}, shared page tables
+	    \footfullcite{ko03}, software-managed inverted page tables
+	    \footfullcite{tall95, huck93}, and BSD/Linux page clustering
+	    algorithms \footfullcite{baba79, dick01}. Additionally,
+	    traditional page descriptor arrays are eliminated by
+	    adapting main-memory database morsel-driven allocation
+	    \footfullcite{kemp14}.
+
+    \item[Hybrid Workload Co-Scheduling:] Thread execution uses $M:N$
+	    threading via Scheduler Activations \footfullcite{ande92}
+	    coupled with Earliest Eligible Virtual Deadline First
+	    (EEVDF) proportional allocation \footfullcite{stoi95} and
+	    parallel gang co-scheduling \footfullcite{oust82, feit92}.
+
+    \item[Asynchronous Zero-Copy I/O and Compatibility:] Inter-process
+	    communication and system invocations rely on lock-free fast
+	    buffers (Fbufs) \footfullcite{drus93} and completion-driven
+	    queues \footfullcite{krie06, ande91}. Multiple binary
+	    compatibility interfaces (Linux, Windows) are supported
+	    through a dynamic personality redirection subsystem
+	    \footfullcite{gerb01, golu91, zajc93, rash87, milo93}.
 \end{description}
