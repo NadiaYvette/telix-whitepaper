@@ -1,0 +1,49 @@
+% rubber: module xelatex
+% rubber: biblatex.path /home/nyc/src/bib/
+% rubber: watch main.bcf
+% rubber: onchange main.bcf 'biber main'
+% rubber: index.tool makeindex
+% biblatex.cmd biber
+\documentclass{report}
+% XXX: get some techreport template
+% \usepackage{cs-techrep}[conference]
+% \usepackage[utf8]{inputenc}
+% \usepackage{csquotes}
+% \usepackage[french,german,turkish,english]{babel}
+\usepackage[backend=biber,style=ieee,autocite=footnote,hyperref=true,sorting=none]{biblatex}
+\usepackage{makeidx}
+\makeindex
+
+\addbibresource{baba79.bib}
+\addbibresource{dick01.bib}
+\addbibresource{klei09.bib}
+\addbibresource{milo93.bib}
+\addbibresource{nava02.bib}
+% \addbibresource{trau64.bib}
+
+\begin{document}
+\author{Nadia Chambers}
+\title{Telix Overview}
+\maketitle
+
+% rubber: depend abstract/abstract.ltx
+The abstract should appear below.
+\input{abstract.ltx}
+The abstract should appear above.
+\tableofcontents
+% rubber: depend intro/intro.ltx
+\input{intro/intro.ltx}
+% rubber: depend memory/memory.ltx
+\input{memory/memory.ltx}
+% rubber: depend scheduling/scheduling.ltx
+\input{scheduling/scheduling.ltx}
+% rubber: depend io/io.ltx
+\input{io/io.ltx}
+% rubber: depend clustering/clustering.ltx
+\input{clustering/clustering.ltx}
+% after chapters before bib
+\printbibliography
+% between bib and idx
+\printindex
+This should appear at the end.
+\end{document}
