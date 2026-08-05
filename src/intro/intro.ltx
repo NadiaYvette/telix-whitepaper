@@ -1,13 +1,48 @@
 \chapter{Introduction}
 
-% This is the introduction\index{introduction}.\autocite{trau64}
+% This is the introduction\index{introduction}.\footfullcite{trau64}
 
 The Telix operating system is meant to serve as a modern operating system
 design for general-purpose use.
 \begin{enumerate}
 	\item{Formal verification for security à la
-		seL4\index{seL4}\autocite{klei09}}
-	\item{superpaging\index{superpaging}\autocite{nava02}}
-	\item{Tightly-controlled kernel memory footprint}
-	\item{Efficient multitasking via shared pagetables and M:N threading}
+		seL4\index{seL4}\footfullcite{klei09}}
+	\item{superpaging\index{superpaging}\footfullcite{nava02}}
+	\item{shared pagetables\footfullcite{ko03}}
+	\item{M:N threading\index{M:N threading} via scheduler
+		activations\index{scheduler activations}
+		\footfullcite{ande92}}
+	\item{asynchronous IO\index{asynchronous IO}
+		\footfullcite{drus93}}
+	\item{coscheduling\index{coscheduling}
+		\footfullcite{oust82}\footfullcite{feit92}}
+	\item{EEVDF\index{EEVDF} scheduling\footfullcite{stoi95}}
+	\item{Barrelfish\index{Barrelfish}
+		multikernel\index{multikernel}\footfullcite{baum09}}
+		Systems are partitioned per the Barrelfish multikernel
+		scheme to subdivide them into smaller domains within
+		which scalability is more easily achievable.
+	\item{Asterinas\index{Asterinas}
+		framekernel\index{framekernel}\footfullcite{peng24}}
+		Within a Barrelfish-style multikernel partition, shared
+		memory and shared address space domains are managed
+		using Asterinas' framekernel technique to provide a safe
+		TCB (Trusted Computing Base).
+	\item{microkernel-enabled\index{microkernel}
+		clustering\index{clustering}\footfullcite{zajc93}
+		\footfullcite{rash87}\footfullcite{golu91}}
+	\item{completion-based system call interface\footfullcite{krie06}
+		\footfullcite{ande91}}
+	\item{personality\index{personality}
+		subsystem\footfullcite{gerb01}\footfullcite{golu91}}
+		ABI compatibility with multiple OSs, where Linux,
+		Windows and others are intended.
+	\item{page clustering\index{page clustering}\footfullcite{dick01}}
+	\item{effective use of inverted
+		pagetables\index{inverted pagetables} where available
+		\footfullcite{tall95}\footfullcite{huck93}}
+	\item{sublinear memory metadata footprint esp. via having no
+		direct equivalents of page
+		descriptor\index{page descriptor} arrays
+		\footfullcite{kemp14}}
 \end{enumerate}
