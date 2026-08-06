@@ -99,3 +99,17 @@ can still contend for too broadly shared of cachelines.
 Something should be said here beyond just that sharing would render
 naïve per- address space locking no longer a natural boundary of
 privacy.
+
+\section{Page Clustering, \texttt{Svnapot}, and Sub-Page Granularity}
+\label{sec:page_clustering_napot}
+
+Modern workload memory access patterns require flexible page granularity to minimize TLB pressure while avoiding internal fragmentation. Telix abstracts underlying MMU capabilities into three primary allocation tiers:
+
+\subsection{Naturally Aligned Power-of-Two (\texttt{Svnapot}) Allocation}
+On RISC-V platforms supporting \texttt{Svnapot}, the memory allocator groups contiguous 4~KiB page frames into 64~KiB clusters. By setting the $N$ bit (bit 63) in the leaf PTE, the hardware MMU collapses 16 physical pages into a single TLB translation entry, reducing TLB miss latency by up to 16$\times$ for bulk data buffers. The \texttt{Svnapot} extension also allows the showcasing of how {page clustering}\index{page clustering} interoperates with superpaging\index{superpaging} for dense page size spectra.
+
+\subsection{Sub-4~KiB Memory Domains via MIPS PageGrain}
+On micro-controller nodes, Telix reconfigures the page table walker via the MIPS \texttt{PageGrain} interface to manage memory at 1~KiB granularity. This allows fine-grained memory protection for lightweight driver routines and embedded continuations without reserving entire 4~KiB frames. The 1~KiB granularity also allows the showcasing of the power of {page clustering}\index{page clustering}.
+
+\subsection{Capability-Backed Memory Allocation}
+When executing on CHERI hardware (such as Arm Morello or CHERI-RISC-V), page tables manage hardware capability bounds rather than coarse page permissions. Memory allocations yield typed, dynamically bounded capabilities that prevent buffer overflows and use-after-free vulnerabilities directly within the Framekernel address space.

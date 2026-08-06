@@ -105,3 +105,19 @@ topologies, memory consistency models, and hardware capability enforcement.
 	    page table tree strategies \footcite{ko03}. Its segregated
 	    TLBs also defeat much of the purpose of superpaging.
 \end{description}
+
+\section{Hardware Acceleration and Architectural Extensions}
+\label{sec:hardware_extensions}
+
+Telix explicitly relies on specialized ISA features to eliminate traditional OS microarchitectural bottlenecks:
+
+\begin{description}
+    \item[\textbf{RISC-V \texttt{Svnapot} Extension}] \footcite{riscv_priv_1_12}:
+    Standard 4~KiB page structures often induce heavy TLB miss rates, while 2~MiB superpages lead to severe internal memory fragmentation. Telix leverages the RISC-V \texttt{Svnapot} (Naturally Aligned Power-of-Two) extension—specifically using the $N$-bit in Page Table Entries (PTEs) to represent 64~KiB contiguous physical allocations within a single TLB entry footprint.
+
+    \item[\textbf{MIPS PageGrain Extension}] \footcite{mips_pra_6_02}:
+    For low-footprint embedded and Personal Area Network (PAN) nodes, standard 4~KiB pages waste substantial memory. Telix utilizes the MIPS \texttt{PageGrain} register (CP0 Register 5, Select 1) to enable sub-4~KiB (1~KiB) page boundaries, alongside hardware-enforced Read-Inhibit (\texttt{RI}) and Execute-Inhibit (\texttt{XI}) permissions.
+
+    \item[\textbf{CHERI Architectural Capabilities}] \footcite{watson19cheri}:
+    Capability Hardware Enhanced RISC Instructions (CHERI) replace conventional virtual address pointers with bounded, unforgeable hardware capabilities. In Telix's Framekernel design, CHERI enables sub-process isolation within a single kernel address space, guaranteeing spatial and temporal memory safety at hardware speed without software bounds-checking overhead.
+\end{description}
