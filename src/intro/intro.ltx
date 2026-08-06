@@ -64,3 +64,44 @@ domain goals:
 	    through a dynamic personality redirection subsystem
 	    \footfullcite{gerb01, golu91, zajc93, rash87, milo93}.
 \end{description}
+
+\section{Target Hardware Architectures \& Execution Models}
+\label{sec:target_architectures}
+
+Telix is designed to target modern 64-bit multi-core hardware platforms.
+Rather than tailoring kernel abstractions to a single ISA, Telix defines a
+uniform execution model while accommodating architectural differences in MMU
+topologies, memory consistency models, and hardware capability enforcement.
+
+\begin{description}
+    \item[RISC-V (\texttt{rv64g} / \texttt{rv64gc}):] Serving as the
+	    primary open reference architecture. RISC-V provides clean
+	    software-managed page table options (Sv39/Sv48),
+	    standardized formal Sail ISA definitions
+	    \footcite{armstrong19}, and an extensible ISA interface
+	    well-suited for framekernel isolation domains. The Svnapot
+	    extensions are of particular interest for the sake of
+	    demonstrating Telix' abilities.
+
+    \item[ARMv8-A / ARMv9-A (AArch64):] The primary production target
+	    for high-core-count datacenter nodes and modern IoT devices.
+	    Telix explicitly accounts for AArch64's weakly-ordered
+	    memory model when synthesizing cross-core synchronization
+	    ring buffers and page table updates \footcite{sosp21vrm}.
+
+    \item[Capability Hardware (CHERI / Arm Morello):] Target platform
+	    for high-assurance deployments. Hardware fine-grained
+	    capabilities allow Telix to enforce spatial and temporal
+	    memory safety directly in hardware, complementing Rust's
+	    software safety guarantees within framekernels
+	    \footcite{katamaran23}. The MIPS \texttt{PageGrain}
+	    extension is of particular interest for the sake of
+	    demonstrating Telix' abilities.
+
+    \item[x86-64:] Supported primarily for broad compatibility on
+	    commodity hardware. While x86-64 provides Total Store Order
+	    (TSO) memory semantics simplifying ring buffer mechanics,
+	    its rigid multi-level page table hierarchy demands shared
+	    page table tree strategies \footcite{ko03}. Its segregated
+	    TLBs also defeat much of the purpose of superpaging.
+\end{description}
