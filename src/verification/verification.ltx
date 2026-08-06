@@ -1,24 +1,71 @@
-\chapter{Verification and Architectural Security}
+\chapter{Formal Verification Framework}
+\label{ch:verification}
 
-\section{Barrelfish Partitioning}
+To guarantee microkernel-grade security alongside bare-metal performance,
+Telix employs a layered formal verification strategy. Rather than viewing the
+operating system in isolation, the verification architecture establishes a
+formal linkage between **hardware state dynamics** (ISA state transitions,
+page table walk invariants, relaxed memory semantics) and **kernel memory safety**
+(type preservation, encapsulation, and data-race freedom).
 
-At the macro scale, hardware is split into independent microkernel nodes
-following the Barrelfish multikernel architecture \footcite{baum09}.
+\section{Hardware State Modeling and Architectural Integrity}
 
-\section{Framekernel TCB}
-Within each node, shared memory and memory safety are maintained using
-an Asterinas-style Framekernel written in Rust \footcite{peng24},
-isolating hardware drivers and memory operations inside explicit safety
-domains.
+The kernel's primary operational role is to drive state transitions in underlying
+hardware peripherals, MMU translation tables, and CPU register files without
+corrupting state invariants. Model choices depend on target ISA semantics and memory architectures:
 
-\section{Formal Verification}
+\begin{description}
+    \item[\textbf{Sail Specification Language}] \footcite{armstrong19}:
+    Acts as the foundational ISA semantic model for RISC-V and ARMv8. Sail models
+    provide executable instruction specifications and automatically synthesize
+    machine-checked definitions for theorem provers (Coq/Isabelle) and SMT solvers.
 
-\subsection{Sail Hardware Models}
+    \item[\textbf{Katamaran}] \footcite{katamaran23}:
+    A semi-automatic separation logic verifier built directly on Sail. Katamaran
+    is ideal if Telix leverages capability-based hardware models (e.g., CHERI/Morello),
+    as it verifies universal contracts directly against hardware specification state transitions.
 
-\subsection{Iris/RustBelt/RBrix and/or Katamaran}
+    \item[\textbf{VRM (Verification on Relaxed Memory)}] \footcite{sosp21vrm}:
+    A specialized framework for verifying multiprocessor OS kernel code managing shared
+    page tables under relaxed memory architectures (such as ARM or RISC-V weakly-ordered memory models).
+    VRM enables verifying concurrent page table updates under sequential consistency assumptions,
+    automatically lifting the proofs to relaxed hardware operational models (\texttt{rmem}) \footcite{pulte18rmem}.
+\end{description}
 
-\subsection{VRM}
+\section{Kernel Memory Access and Race-Freedom Verification}
 
-\subsection{rmem}
+At the language layer, Telix relies on Rust's strong static type system for safe code.
+However, kernel boot sequences, MMU configuration, and atomic lockfree synchronization
+require \texttt{unsafe} abstractions. We evaluate three primary verification frameworks for these boundaries:
 
-\subsection{CompCert}
+\begin{table}[h]
+\centering
+\begin{threeparttable}
+\caption{Comparative Analysis of Formal Verification Toolchains}
+\label{tab:verification_comparison}
+\begin{tabularx}{\textwidth}{l X X X}
+\toprule
+\textbf{Toolchain} & \textbf{Primary Domain} & \textbf{Strengths} & \textbf{Dependencies / Trade-offs} \\
+\midrule
+\textbf{Iris Framework}\footnotemark & Higher-Order Concurrent Separation Logic & Expressive higher-order invariants; foundational theorem prover support in Coq. & High manual proof effort; steep learning curve. \\
+\midrule
+\textbf{RustBelt}\footnotemark & Semantic Soundness of Rust & Formalized proof framework built on Iris to verify \texttt{unsafe} standard library blocks. & Geared towards standard library abstractions; requires formal mapping for custom kernel primitives. \\
+\midrule
+\textbf{RefinedC / Islaris}\footnotemark & Automated Verification of C / Binary Code & High degree of proof automation via SMT; links binary execution directly to Sail semantics. & Primarily targeted at low-level procedural C and binary stubs rather than idiomatic Rust. \\
+\bottomrule
+\end{tabularx}
+\begin{tablenotes}
+	\small
+	\item[5]{\fullcite{jung15iris}}
+	\item[6]{\fullcite{jung18rustbelt}}
+	\item[7]{\fullcite{sammler21}}
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\subsection{Verification Strategy Selection Matrix}
+
+\begin{itemize}
+    \item \textbf{Option A (Pure Iris / RustBelt Integration):} Best fit if the Framekernel minimizes C/assembly stubs and exposes driver interfaces purely as safe Rust primitives validated via RustBelt semantics.
+    \item \textbf{Option B (Sail + Katamaran + VRM):} Best fit if the multikernel partition layer relies heavily on explicit hardware memory barriers, shared page table manipulation across CPU cores, or capability extensions.
+\end{itemize}

@@ -13,6 +13,13 @@
 \usepackage{hyperref}
 \usepackage[backend=biber,style=authoryear,hyperref=true]{biblatex}
 \usepackage{makeidx}
+\usepackage{tabularx}
+\usepackage{booktabs}
+% Teaches footnotehyper to automatically save/flush footnotes
+% inside tabularx
+% \usepackage{footnotehyper}
+% \makesavenoteenv{tabularx}
+\usepackage{threeparttable}
 \makeindex
 
 \addbibresource[glob=true]{./bib/*.bib}
