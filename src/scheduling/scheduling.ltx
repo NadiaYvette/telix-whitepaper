@@ -1,12 +1,15 @@
 \chapter{Process Scheduling \& Execution Model}
 
-\section{M:N Threading via Scheduler Activations}
+\section{$M:N$ Threading via Scheduler Activations}
 
 Telix decouples user-level thread scheduling from kernel-level
 dispatching using $M:N$ Scheduler Activations \footcite{ande92}. The
 kernel notifies the user-level runtime of blocking events (e.g., page
 faults, I/O delays) via explicit upcalls, enabling user space to
-schedule another ready thread without losing CPU allocations.
+schedule another ready thread without losing CPU allocations. To further
+clarify, the revisions of the original scheduler activation architecture
+demonstrated in Nemesis\footcite{lesl96} are used for the sake of
+greater efficiency.
 
 \section{Fair-Share Mechanics}
 
