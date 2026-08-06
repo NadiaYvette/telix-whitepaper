@@ -1,11 +1,77 @@
-\chapter{Clustering}
+\chapter{Clustering, PANs, and Distributed State}
+\label{ch:clustering}
 
-Something about clustering is worth saying here. IoT, PANs, competition
-with OpenHarmony and potentially other kernels, and more may all be
-relevant.
+As computing environments shift from isolated monolithic hosts to hyper-connected Personal Area Networks (PANs), micro-edge clusters, and disaggregated NUMA topologies, operating systems must treat distribution as a first-class execution primitive.
+
+While platforms like OpenHarmony \footcite{openharmony23} and Fuchsia \footcite{fuchsia_zircon} provide high-level distributed service buses over heavy user-space IPC, Telix unifies single-node multikernel partitions and multi-device PAN topologies under a single explicit capability-driven message-passing control plane.
+
+\section{System Positioning: Heterogeneous Edge \& PAN Topologies}
+\label{sec:clustering_positioning}
+
+Telix scales seamlessly from sub-4~KiB memory-constrained sensor nodes running MIPS \texttt{PageGrain} hardware \footcite{mips_pra_6_02} up to high-core-count server partitions running RISC-V \texttt{Svnapot} superpages \footcite{riscv_priv_1_12}.
+
+\begin{description}
+    \item[\textbf{Personal Area Networks (PANs):}] Low-power wireless nodes (BLE, Ultra-Wideband, IEEE 802.15.4) act as remote peripherals within a unified distributed capability domain. Memory-constrained PAN nodes export localized peripheral endpoints while offloading heavy async continuation processing to primary nodes.
+
+    \item[\textbf{Competitive Positioning vs. OpenHarmony / Fuchsia:}] OpenHarmony achieves multi-device integration by running full Android/Linux subsystems linked via RPC daemons. Fuchsia uses Zircon channels with explicit FIDL IPC interfaces. Telix eliminates the dual-runtime penalty by compiling uniform zero-copy Rust continuation channels locally, which dynamically wrap into lightweight networked packet frames when crossing physical transport boundaries.
+\end{description}
 
 \section{Distributed Filesystem Access State}
+\label{sec:distributed_fs}
+
+Telix eschews centralized VFS locks in favor of a capability-indexed, conflict-free replicated data type (CRDT) namespace, building on concepts from Plan 9 \footcite{pike90plan9} and modern distributed object stores.
+
+\subsection{Capability-Bounded Distributed Caching}
+Filesystem handles are represented as capability tokens containing object IDs, cryptographically signed access rights, and generational offset invariants.
+\begin{itemize}
+    \item \textbf{Ephemeral Edge Caching:} Edge nodes cache read-only extent blocks in local sub-page pools.
+    \item \textbf{Lease-Based Mutation:} Write operations require acquiring a transient, single-writer capability lease from the authority node. If a low-power PAN node loses connectivity, the lease automatically expires without stalling host execution.
+\end{itemize}
 
 \section{Distributed Network Access State}
+\label{sec:distributed_net}
 
-\section{Process Migration}
+Networking in a Telix cluster is decoupled from physical interface ownership. Socket state machines operate as distributed continuations that can dynamically migrate between hardware network interface cards (NICs).
+
+\subsection{Transparent Socket Migration}
+Instead of pinning a socket to a specific node's TCP/IP stack:
+1. Sockets are registered as virtual channels within the multikernel transport routing layer.
+2. Packet processing queues are exposed as memory-mapped submission and completion rings (\texttt{io\_uring}-style).
+3. When a device moves across physical PAN access points, the socket continuation state remains active while the underlying ring buffer transport re-binds to the new physical link layer without dropping protocol connection state.
+
+\section{Process and Continuation State Migration}
+\label{sec:task_migration}
+
+Conventional operating systems struggle with process migration because raw virtual memory pages, register sets, and execution stacks must be frozen and transferred over the wire \footcite{clark05migration}.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=1.5cm, auto]
+    % Stack-based traditional migration
+    \node [draw, rectangle, fill=red!10, text width=4.5cm, align=center] (trad) {
+        \textbf{Traditional OS Migration}\\
+        \small Transfers Full Page Tables, Kernel Stacks, and Address Space\\
+        \textbf{Cost: $O(\textrm{RAM Size})$ (Megabytes/Gigabytes)}
+    };
+
+    % Continuation-based Telix migration
+    \node [draw, rectangle, fill=green!10, text width=4.5cm, align=center, right=1.0cm of trad] (telix) {
+        \textbf{Telix Continuation Migration}\\
+        \small Transfers Anonymous Async State Machine Struct \& Capability Handle\\
+        \textbf{Cost: $O(1)$ (Bytes/Kilobytes)}
+    };
+\end{tikzpicture}
+\caption{Comparison of traditional full-stack process migration versus Telix stackless continuation serialization.}
+\label{fig:continuation_migration}
+\end{figure}
+
+\subsection{Stackless Serialization Mechanics}
+Because Telix constructs concurrent kernel tasks using stackless Rust \texttt{Future} continuations, an in-flight operation is represented in memory as an anonymous compiler-generated state machine enum.
+
+To migrate an executing task across nodes:
+\begin{enumerate}
+    \item The origin node pauses polling on the task's root \texttt{Future}.
+    \item The state machine structure (containing only active variable fields rather than unallocated stack frame space) is serialized.
+    \item Associated memory handles are reassigned as remote hardware capability tokens.
+    \item The target node resumes execution simply by calling \texttt{Future::poll()} on its local event loop.
+\end{enumerate}
