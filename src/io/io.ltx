@@ -2,8 +2,20 @@
 
 \section{Completion-Based Asynchronous System Calls}
 
-Rather than relying on synchronous trap-based system calls, Telix implements a non-blocking completion interface inspired by K42 \footcite{krie06} and Scheduler Activation upcalls \footcite{ande91}. System invocations are submitted to shared ring buffers, allowing user and kernel space to communicate asynchronously without forced privilege-level transitions.
+Rather than relying on synchronous trap-based system calls, Telix
+implements a non-blocking completion interface inspired by K42
+\footcite{krie06} and Scheduler Activation upcalls \footcite{ande91}.
+System invocations are submitted to shared ring buffers, allowing user
+and kernel space to communicate asynchronously without forced
+privilege-level transitions.
+\\
+Being more narrowly focussed on IO might be worthwhile to avoid
+redundancy with the personality chapter's coverage of the native
+syscall API.
 
 \section{Zero-Copy Cross-Domain Buffering}
 
-High-throughput networking and disk I/O use lock-free, zero-copy cross-domain Fast Buffers (Fbufs) \footcite{drus93}. Memory pages are pooled and transferred across user-kernel boundaries by swapping buffer ownership rather than copying byte payloads.
+High-throughput networking and disk I/O use lock-free, zero-copy
+cross-domain Fast Buffers (Fbufs) \footcite{drus93}. Memory pages are
+pooled and transferred across user-kernel boundaries by swapping buffer
+ownership rather than copying byte payloads.

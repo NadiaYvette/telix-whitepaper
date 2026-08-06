@@ -72,8 +72,28 @@ earlier sections of the chapter.
 
 \section{Framekernels, Multikernels and Address Spaces}
 
-The relationships here should be clarified.
+The relationships here should be clarified as they pertain to virtual
+address space management.
 
 \section{Effective Use of Inverted Pagetables}
 
+Just using a real API instead of a data structure crossdressing every
+architecture as x86 enables the effective use of inverted pagetables,
+which radically conserve space relative to naïve schemes like unshared
+radix tree pagetables.
+
 \section{Shared Pagetables}
+
+Where radix tree pagetables are demanded by hardware, or where other
+multiway trees are used, sharing nodes of the tree structures is needed
+to mitigate data structure proliferation. Naïvely doing this can cause
+contention, hence per-CPU or per-NUMA-node replication should also be
+part of such a strategy to prevent that. This also still applies with
+lockfree or fine-grained-locked pagetables because the atomic updates
+can still contend for too broadly shared of cachelines.
+
+\section{Lockfree or Fine-Grained-Locked Pagetables}
+
+Something should be said here beyond just that sharing would render
+naïve per- address space locking no longer a natural boundary of
+privacy.

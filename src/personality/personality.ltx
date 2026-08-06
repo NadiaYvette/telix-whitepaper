@@ -9,16 +9,31 @@ user-level microkernel applications \footcite{golu91} backed by
 distributed Mach-style cluster messaging
 \footcite{zajc93, rash87, milo93}.
 
+\section{Native Completion-Based System Call API}
+
+There's a great deal to say here. Following precedents set by
+\texttt{k42}\footcite{krie06} is the bulk of it.
+
+\subsection{\texttt{io\_uring}-alike Facility}
+There's a citation somewhere here that I lost for \texttt{io\_uring}.
+
+\subsection{Asynchronous Page Faults and Other Upcalls}
+New-style scheduler activations keep upcalls moderately narrowly
+specialised to events like asynchronous page faults so that thread
+engines can be invoked upon operations blocking. I likely need to figure
+out the citation to make here too.
+
 \section{Linux Personality}
+There may not be much to say here besides it being important economically.
 
 \section{Windows Personality}
 
-WINE can basically be run as a server.
+WINE can basically be run as a server. This is also largely economic.
 
 \section{OpenHarmony Personality}
+While economic, OpenHarmony also has notable technology.
 
 \section{Zircon Personality}
-
-\section{Native Completion-Based System Call API}
-
-\subsection{\texttt{io\_uring}-alike Facility}
+This might be an economic reach toward the Google ecosystem, though
+there are questions about how broadly Fuchsia, whose kernel Zircon is,
+is being deployed.

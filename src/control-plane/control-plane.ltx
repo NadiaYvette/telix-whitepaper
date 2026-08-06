@@ -1,7 +1,16 @@
 \chapter{Control Plane Structure}
 
-Does this make sense to separate from IO?
+There should be something more detailed to say here, but this is as much
+as has been written thus far.
 
 \section{Framekernels: Continuations and State Machines}
 
-\section{Multikernels: Message Passing Like Network Protocols}
+Rust appears to have a way to support continuation-passing style.
+Within a framekernel domain, state machines and continuations are the
+fundamental control flow dispatch mechanism.
+
+\section{Multikernels: Network Protocol Like Message Passing}
+
+Between the multikernel's partitions or subdomains, microkernel-style
+message passing is handled in an explicitly network protocol handling
+-oriented fashion.
