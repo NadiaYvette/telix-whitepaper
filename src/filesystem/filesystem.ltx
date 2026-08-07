@@ -1,0 +1,52 @@
+\chapter{Distributed Virtual Filesystem and Storage Services}
+\label{ch:filesystem}
+
+In monolithic operating systems, the Virtual Filesystem (VFS) and block storage layers are deeply entangled with the kernel's virtual memory subsystem (via the page cache) and synchronization primitives. Telix abandons this monolithic coupling. The Framekernel fundamentally does not understand files, directories, or mount points. 
+
+Instead, the VFS and all concrete filesystem implementations operate entirely as isolated, privileged user-space servers. By leveraging the bimodal capability transports established in Chapter~\ref{ch:io}, Telix elevates the filesystem from a local kernel component into a transparently distributed, language-agnostic cluster service.
+
+\section{Decoupling Virtual Memory from the Filesystem}
+\label{sec:fs_vm_decoupling}
+
+Early proof-of-concept implementations of Telix tightly coupled VFS handling with the virtual memory layer to facilitate memory-mapped I/O (\texttt{mmap}). While common in monolithic kernels, this design violates microkernel isolation and complicates distributed caching.
+
+In the revised Telix architecture, Virtual Memory and the VFS are strictly decoupled using the **External Pager** paradigm \footcite{liedtke95l4, abrossimov89mach}:
+\begin{enumerate}
+    \item When an application attempts to access an unmapped page of a memory-mapped file, the hardware generates a page fault.
+    \item The Framekernel catches the fault, suspends the faulting continuation, and synthesizes an asynchronous capability message (via a Port) to the designated External Pager—in this case, the VFS Server.
+    \item The VFS Server resolves the block location, issues a bulk read via its I/O ring to the disk driver, and replies to the kernel with a Memory Morsel capability containing the loaded data.
+    \item The Framekernel maps the Morsel into the faulting application's address space and resumes the continuation.
+\end{enumerate}
+This completely removes storage logic from the kernel's critical path while fully supporting zero-copy page caching.
+
+\section{Language-Agnostic Abstraction of the Async Burden}
+\label{sec:fs_language_abstraction}
+
+Implementing filesystems atop a purely asynchronous, continuation-passing control plane imposes a significant programming burden in traditional C or C++. Driver logic must be manually segmented into state machines that explicitly yield execution while awaiting disk DMA or cluster RPCs.
+
+However, moving the VFS to user space allows Telix to implement storage servers in high-level, memory-safe languages with advanced concurrency models (e.g., Haskell, Mercury, or Koka) \footcite{hunt07singularity}. 
+\begin{itemize}
+    \item \textbf{Algebraic Effect Handlers:} Languages like Koka can naturally model asynchronous I/O and capability passing as algebraic effects. The compiler automatically transforms linear, synchronous-looking filesystem code into the asynchronous continuation state machines required by the Telix runtime.
+    \item \textbf{High-Level Rings:} The complex lock-free mechanics of the mapped Submission/Completion Queues (SQ/CQ) are completely abstracted by the language's runtime environment, allowing filesystem developers to focus entirely on on-disk structural logic.
+\end{itemize}
+
+\section{The VFS as a Distributed Capability Router}
+\label{sec:fs_clustering}
+
+Because Telix's base transport primitive—the Capability Port—is network-transparent, clustering support is not bolted onto the filesystem; it is an inherent property of the architecture.
+
+The Telix VFS does not actually read or write bytes; it is a **namespace router**. When a client application invokes \texttt{open("/mnt/cluster/data.txt")}:
+\begin{enumerate}
+    \item The client sends a path-resolution message to the root VFS server.
+    \item The VFS parses the path and determines that \texttt{/mnt/cluster} delegates to an APFS storage server physically residing on Node B of the cluster.
+    \item The VFS forwards the resolution request, and the remote APFS server returns a direct Capability Port bound to that specific file.
+    \item All subsequent \texttt{read()} and \texttt{write()} operations bypass the VFS entirely. The client streams data directly to the APFS server on Node B via bimodal capability transports, seamlessly utilizing local memory rings if migrated to Node B, or network RPCs if remaining on Node A.
+\end{enumerate}
+This ensures that the VFS never becomes a centralized bottleneck for data-plane streaming \footcite{welch08pnfs}.
+
+\section{Legacy Filesystem Servers and Isolation}
+\label{sec:fs_legacy}
+
+Despite radical shifts in the control plane, data gravity dictates that a modern OS must support industry-standard on-disk formats. Telix is designed to host ported or clean-room implementations of dominant filesystems—including APFS, Btrfs, Ext4, FAT, NTFS, UDF, XFS, and ZFS—as independent user-space daemons.
+
+Isolating legacy filesystems provides profound reliability guarantees. A corruption bug or panic in a complex, legacy implementation like Btrfs or NTFS will simply crash the isolated \texttt{btrfs-server} process. The Telix Framekernel remains unaffected, and the supervisor tree can instantly restart the filesystem server, re-attach its IOMMU capability bindings, and replay pending continuation requests without requiring a system reboot.
