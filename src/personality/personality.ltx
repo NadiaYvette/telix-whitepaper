@@ -94,7 +94,7 @@ The Linux personality server provides POSIX compatibility by wrapping monolithic
 
 \begin{itemize}
     \item \textbf{File Descriptor Table Mapping:} Linux integer file descriptors (`0, 1, 2, ...`) are maintained in a thread-local, lock-free array that translates indices directly into native Telix Capability Tokens.
-    \item \textbf{Asynchronous Event Unification:} Linux \texttt{epoll} and \texttt{io\_uring} calls are mapped 1:1 onto Telix asynchronous continuation polling loops, eliminating impedance mismatch between Linux event loops and native Telix continuations.
+    \item \textbf{Asynchronous Event Unification:} Linux \texttt{epoll} and \texttt{io\_uring} calls are natively mapped 1:1 to Telix asynchronous continuation polling loops (as detailed in Section~\ref{sec:mn_threading}), eliminating impedance mismatch between Linux event loops and Telix execution state.
     \item \textbf{Signal Serialization:} POSIX signals are converted into serialized event messages pushed to the target task's capability queue, executing signal handlers as high-priority Rust continuations.
 \end{itemize}
 
@@ -115,7 +115,7 @@ Opaque Windows \texttt{HANDLE} references are mapped directly into Telix capabil
 \midrule
 \texttt{HANDLE} (File/Section) & Memory Extent Capability & Direct page frame mapping into user space. \\
 \midrule
-\texttt{NtCreateSection} & Shared Morsel Allocation & Allocates shared memory capability range. \\
+\texttt{NtCreateSection} & Shared Morsel Allocation & Allocates shared capability range (see Chapter~\ref{ch:memory}). \\
 \midrule
 \texttt{ALPC} Message Port & Microkernel Capability Channel & Zero-copy ring buffer messaging. \\
 \midrule
