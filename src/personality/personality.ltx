@@ -63,3 +63,74 @@ This might be an economic reach toward the Google ecosystem, though
 there are questions about how broadly Fuchsia, whose kernel Zircon is,
 is being deployed. There are similar questions about exclusion from
 interoperation via policy as OpenHarmony.
+
+% =========================================================================
+% ADDITIVE SECTION: To be appended to src/personality/personality.ltx
+% =========================================================================
+
+\section{Foreign ABI Emulation and Subsystem Personalities}
+\label{sec:foreign_abi_emulation}
+
+While native Telix applications interact directly with capability tokens and async continuation rings, supporting legacy and component ecosystem binaries requires mapping foreign Application Binary Interfaces (ABIs) onto native primitives.
+
+Rather than embedding foreign OS syscall handlers inside the
+Framekernel, Telix delegates ABI emulation to isolated user-space
+\textit{Personality Servers} \footcite{haertig97l4}.
+
+\subsection{Trap Redirection and User-Space Interception}
+
+When an unmodified foreign binary executes a hardware system call trap (e.g., x86 \texttt{syscall}, ARM \texttt{svc}, or RISC-V \texttt{ecall}), execution is handled via one of two paths:
+
+\begin{description}
+    \item[\textbf{Fast-Path vDSO / Libc Shim:}] For dynamically linked workloads, Telix supplies a specialized user-space shim library (\texttt{vDSO} or custom \texttt{libc}) that intercepts system call invocations before triggering a hardware trap, encoding the request directly into a native capability ring submission.
+
+    \item[\textbf{OutOf-Domain Trap Redirection:}] Statically linked binaries trigger an architectural fault upon executing a hardware trap. The Framekernel catches the exception and bounces control directly to the registered Personality Server's event loop without executing high-privilege kernel intervention code.
+\end{description}
+
+\subsection{Linux POSIX Personality Server}
+\label{sec:linux_personality}
+
+The Linux personality server provides POSIX compatibility by wrapping monolithic Linux abstractions around Telix capabilities \footcite{daSilva20wsl}:
+
+\begin{itemize}
+    \item \textbf{File Descriptor Table Mapping:} Linux integer file descriptors (`0, 1, 2, ...`) are maintained in a thread-local, lock-free array that translates indices directly into native Telix Capability Tokens.
+    \item \textbf{Asynchronous Event Unification:} Linux \texttt{epoll} and \texttt{io\_uring} calls are mapped 1:1 onto Telix asynchronous continuation polling loops, eliminating impedance mismatch between Linux event loops and native Telix continuations.
+    \item \textbf{Signal Serialization:} POSIX signals are converted into serialized event messages pushed to the target task's capability queue, executing signal handlers as high-priority Rust continuations.
+\end{itemize}
+
+\subsection{Windows NT Subsystem Emulation}
+\label{sec:windows_personality}
+
+Unmodified Portable Executable (PE) binaries expecting the Windows Native API (\texttt{Nt*} / \texttt{Zw*} routines) are served by the NT personality server \footcite{wine_design}.
+
+Opaque Windows \texttt{HANDLE} references are mapped directly into Telix capability slots:
+
+\begin{table}[h]
+\centering
+\caption{Mapping Windows NT Executive Objects to Native Telix Capabilities}
+\label{tab:nt_object_mapping}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Windows NT Primitive} & \textbf{Telix Capability Equivalent} & \textbf{Emulation Mechanism} \\
+\midrule
+\texttt{HANDLE} (File/Section) & Memory Extent Capability & Direct page frame mapping into user space. \\
+\midrule
+\texttt{NtCreateSection} & Shared Morsel Allocation & Allocates shared memory capability range. \\
+\midrule
+\texttt{ALPC} Message Port & Microkernel Capability Channel & Zero-copy ring buffer messaging. \\
+\midrule
+\texttt{NtWaitForSingleObject} & Async Continuation Poll & Suspends task until capability event signals. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Next-Gen Component ABIs: Zircon \& OpenHarmony}
+\label{sec:nextgen_abis}
+
+In addition to legacy monolithic ABIs, Telix natively supports modern component-oriented architectures:
+
+\begin{description}
+    \item[\textbf{Fuchsia / Zircon ABI}] \footcite{fuchsia_zircon}: Zircon relies on Object Handles and Channel Message passing (FIDL). Because Telix's native capability model is structurally isomorphic to Zircon handles, Zircon syscalls exhibit near 1:1 translation efficiency into native Telix capability channels.
+
+    \item[\textbf{OpenHarmony Subsystem}] \footcite{openharmony23}: OpenHarmony services communicate via Binder IPC. Telix emulates Binder interfaces using lock-free shared memory rings, allowing OpenHarmony components to run transparently across Telix multikernel partitions.
+\end{description}
