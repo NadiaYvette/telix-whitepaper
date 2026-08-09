@@ -119,7 +119,7 @@ When executing on CHERI hardware (such as Arm Morello or CHERI-RISC-V), page tab
 
 Modern monolithic operating systems suffer from severe metadata bloat. As physical memory capacities scale into the terabytes, the traditional \texttt{mem\_map} array (which allocates a static descriptor for every physical hardware page) consumes gigabytes of RAM purely for bookkeeping. Furthermore, the conflation of physical allocation units with virtual mapping granularities leads to brittle architectures that struggle to balance ABI compatibility with TLB efficiency.
 
-Telix completely redesigns memory management around three principles: **ABI-Preserving Page Clustering** (reducing physical tracking overhead), **Coremaplessness** (sublinear physical metadata via lock-free, in-band allocators), and **Extent-Based Virtual Indexing** (sublinear virtual metadata via software inverted page tables).
+Telix completely redesigns memory management around three principles: \textit{ABI-Preserving Page Clustering} (reducing physical tracking overhead), \textit{Coremaplessness} (sublinear physical metadata via lock-free, in-band allocators), and \textit{Extent-Based Virtual Indexing} (sublinear virtual metadata via software inverted page tables).
 
 \section{ABI-Preserving Page Clustering}
 \label{sec:mem_clustering}
@@ -137,7 +137,7 @@ This approach reduces the physical page descriptor array footprint by a factor o
 \section{Coremaplessness: Lock-Free Physical Memory Management}
 \label{sec:mem_coremapless}
 
-While page clustering reduces the required physical descriptor footprint by a factor of $B$, global contiguous descriptor arrays still impose a linear metadata tax. Telix seeks to eliminate this entirely via a **coremapless** architecture.
+While page clustering reduces the required physical descriptor footprint by a factor of $B$, global contiguous descriptor arrays still impose a linear metadata tax. Telix seeks to eliminate this entirely via a \textit{coremapless} architecture.
 
 Telix replaces boot-time-reserved page descriptor arrays with a lock-free adaptation of the \textbf{LLFree} allocator \footcite{litz2021llfree}, modified to utilize strict \textbf{in-band metadata}:
 
@@ -151,9 +151,9 @@ By pushing metadata exclusively into free space and virtual extents, Telix bound
 \section{Superpaging and the Dense Page Size Spectrum}
 \label{sec:mem_superpaging}
 
-While clustering addresses physical fragmentation, **Superpaging** is a hardware-defined acceleration mechanism used to reduce TLB misses and shrink virtual metadata overhead.
+While clustering addresses physical fragmentation, \textit{Superpaging} is a hardware-defined acceleration mechanism used to reduce TLB misses and shrink virtual metadata overhead.
 
-Telix bridges page clustering ($Z$) and hardware superpaging seamlessly when executing on architectures that provide a **dense page size spectrum**, such as ARM64's Contiguous Bit or RISC-V's Naturally Aligned Power-Of-Two (NAPOT) extensions.
+Telix bridges page clustering ($Z$) and hardware superpaging seamlessly when executing on architectures that provide a \textit{dense page size spectrum}, such as ARM64's Contiguous Bit or RISC-V's Naturally Aligned Power-Of-Two (NAPOT) extensions.
 
 If an application maps a fully contiguous range of fragments that cover an entire clustered allocation $Z$, and $Z$ aligns with a hardware-supported dense encoding (e.g., RISC-V NAPOT encoding a 64 KiB block into a single base PTE), Telix seamlessly upgrades the mapping into a micro-superpage. If the mapping is subsequently fragmented (e.g., via \texttt{mprotect}), Telix shatters the superpage back into $B$ individual $K$-sized PTEs, ensuring ABI preservation while maximizing opportunistic hardware acceleration.
 
@@ -183,13 +183,27 @@ By relying on extent-based sharing, thousands of processes can map the same giga
 \section{Inverted Page Tables and Software TLB Refills}
 \label{sec:mem_ipt}
 
-With virtual memory metadata safely compressed into extent trees, the hardware-defined page tables function merely as a large, fully recoverable translation cache for the hardware MMU.
+With virtual memory metadata safely compressed into extent trees, the
+hardware-defined page tables function merely as a large, fully
+recoverable translation cache for the hardware MMU.
 
-Telix pursues this logic to its apex by utilizing **Inverted Page Tables (IPT)** where supported. Rather than maintaining a per-process hierarchical page table, an IPT contains one entry per physical frame, indexed by a hash of the Virtual Address and Address Space ID (ASID).
+Telix pursues this logic to its apex by utilizing \textit{Inverted Page
+Tables (IPT)} where supported. Rather than maintaining a per-process
+hierarchical page table, an IPT contains one entry per physical frame,
+indexed by a hash of the Virtual Address and Address Space ID (ASID).
 
 \begin{description}
-    \item[\textbf{Software Refill Integration:}] On architectures with software-managed TLBs (e.g., MIPS, early RISC-V profiles), the Telix Framekernel walks the ART/B+ extent trees directly to refill the TLB, bypassing traditional PTE arrays entirely.
-    \item[\textbf{Hardware IPT Parallels:}] Telix's software structures heavily mirror historical architectural apexes like the IA-64 Virtual Hash Page Table (VHPT) and IBM POWER's Segment Lookaside Buffers (SLB). Where hardware supports sharing IPT entries across domains, Telix completely eliminates page table duplication for shared memory IPC rings.
+    \item[\textbf{Software Refill Integration:}] On architectures with
+	    software-managed TLBs (e.g., MIPS, early RISC-V profiles),
+	    the Telix Framekernel walks the ART/B+ extent trees directly
+	    to refill the TLB, bypassing traditional PTE arrays entirely.
+    \item[\textbf{Hardware IPT Parallels:}] Telix's software structures
+	    heavily mirror historical architectural apexes like the
+	    IA-64 Virtual Hash Page Table (VHPT) and IBM POWER's Hashed
+	    Page Table (HPT) and Segment Lookaside Buffers (SLB). Where
+	    hardware supports sharing IPT entries across domains, Telix
+	    completely eliminates page table duplication for shared
+	    memory IPC rings.
 \end{description}
 
 \section{Hardware Capability Bounds: CHERI and Morello}
@@ -226,7 +240,7 @@ The proposed Telix memory subsystem is guided by a multi-faceted design matrix i
 \section{ABI-Preserving Page Clustering and Fragmentation Frontiers}
 \label{sec:mem_clustering}
 
-Page clustering is frequently misunderstood as a mechanism for reducing virtual metadata or achieving sublinear scaling. In reality, page clustering achieves only a linear reduction in physical metadata in traditional kernel designs (where global descriptor arrays exist), while leaving virtual page table footprints completely unaltered. In Telix, which eschews global descriptor arrays entirely, page clustering serves a different, highly strategic purpose: **tuning the frontier between internal and external fragmentation**.
+Page clustering is frequently misunderstood as a mechanism for reducing virtual metadata or achieving sublinear scaling. In reality, page clustering achieves only a linear reduction in physical metadata in traditional kernel designs (where global descriptor arrays exist), while leaving virtual page table footprints completely unaltered. In Telix, which eschews global descriptor arrays entirely, page clustering serves a different, highly strategic purpose: \textit{tuning the frontier between internal and external fragmentation}.
 
 \subsection{Nomenclature and Structural Abstraction}
 
@@ -258,15 +272,15 @@ Page clustering provides two distinct operational benefits depending on the hard
 \begin{description}
     \item[\textbf{Sparse Page Size Spectra (Large $W$, \emph{Sprungweite}):}] On architectures with a wide gap between base page sizes and the first non-trivial superpage size (large $W$), page clustering acts as a bridge. However, this is treated as a trivial case: it merely shaves an additive constant off the required order of superpage allocations without changing underlying algorithms.
 
-    \item[\textbf{Dense Spectra and Allocation Guarantees:}] Where page clustering achieves a profound, qualitative breakthrough is for smaller superpage sizes. By maintaining physical allocations at the $Z$ boundary, Telix can **guarantee that allocations for smaller-size superpages will never fail due to external fragmentation**. This eliminates the need for heavyweight, unpredictable runtime memory compaction or reserved pool strategies (such as those historically used in HP-UX).
+    \item[\textbf{Dense Spectra and Allocation Guarantees:}] Where page clustering achieves a profound, qualitative breakthrough is for smaller superpage sizes. By maintaining physical allocations at the $Z$ boundary, Telix can \textit{guarantee that allocations for smaller-size superpages will never fail due to external fragmentation}. This eliminates the need for heavyweight, unpredictable runtime memory compaction or reserved pool strategies (such as those historically used in HP-UX).
 \end{description}
 
 \section{Pervasive Extent-Based Accounting and Coremaplessness}
 \label{sec:mem_coremapless}
 
-Sublinear physical memory management metadata is achieved in Telix not through clustering, but through **Pervasive Extent-Based Internal Accounting**.
+Sublinear physical memory management metadata is achieved in Telix not through clustering, but through \textit{Pervasive Extent-Based Internal Accounting}.
 
-Traditional operating systems reserve a contiguous array of physical page descriptors (e.g., Linux \texttt{mem\_map}) at boot time. Telix proposes a completely **coremapless** architecture, replacing static descriptor arrays with a lock-free adaptation of the **LLFree** allocator \footcite{litz2021llfree} utilizing in-band metadata:
+Traditional operating systems reserve a contiguous array of physical page descriptors (e.g., Linux \texttt{mem\_map}) at boot time. Telix proposes a completely \textit{coremapless} architecture, replacing static descriptor arrays with a lock-free adaptation of the \textit{LLFree} allocator \footcite{litz2021llfree} utilizing in-band metadata:
 
 \begin{itemize}
     \item \textbf{Unallocated Memory:} Free physical frames store their own allocation metadata (such as lock-free LIFO list pointers and buddy order markers) directly inside the unallocated memory space itself.
@@ -282,23 +296,33 @@ Addressing virtual memory metadata overhead presents a distinct set of trade-off
 
 A major challenge in modern CPU design is the presence of mandatory hardware page-table walkers. On architectures that enforce multi-level hierarchical page tables (e.g., x86-64, ARM64, RISC-V), hardware walkers render pure Inverted Page Tables (IPT) unusable for direct hardware MMU fills.
 
-To mitigate virtual metadata bloat under mandatory hardware walkers, Telix proposes **Extent-Driven Page Table Sharing**:
+To mitigate virtual metadata bloat under mandatory hardware walkers, Telix proposes \textit{Extent-Driven Page Table Sharing}:
 \begin{itemize}
-    \item Canonical address space mappings will be maintained in compressed software structures combining **Adaptive Radix Trees (ART)** (for dense extents) and **B+ Trees** (for sparse ranges).
+	\item Canonical address space mappings will be maintained in compressed software structures combining \textit{Adaptive Radix Trees (ART)} (for dense extents) and \textit{B+ Trees} (for sparse ranges).
     \item When multiple processes share memory segments (e.g., mass-shared libraries, shared-memory IPC rings, or post-\texttt{fork} execution), the underlying hardware page tables will be shared directly across processes.
     \item To avoid cache-line contention and lock bottlenecks on multi-core systems, shared page table nodes will employ localized replication mechanisms, balancing metadata footprint against concurrent traversal performance.
 \end{itemize}
 
 \subsection{Inverted Page Tables and Software-Refill Architectures}
 
-On CPU architectures featuring software-managed TLB refills (e.g., MIPS, software-refill RISC-V profiles) or native hardware IPT support (e.g., 64-bit SPARC, IA-64 Virtual Hash Page Tables [VHPT], and IBM POWER Segment Lookaside Buffers [SLB]), Telix will actively utilize Inverted Page Tables.
+On CPU architectures featuring software-managed TLB refills (e.g., MIPS,
+software-refill RISC-V profiles) or native hardware IPT support (e.g.,
+64-bit SPARC, IA-64 Virtual Hash Page Tables [VHPT], and IBM POWER
+Hashed Page Tables [HPT] and Segment Lookaside Buffers [SLB]), Telix
+is intended to actively utilize Inverted Page Tables.
 
-In these environments, the IPT contains one entry per physical frame, indexed via a hash of the Virtual Address and Address Space ID (ASID). Telix will explore whether hardware-unassisted IPTs in pure software-refill architectures provide a net performance benefit over direct ART/B+ extent tree walks, treating software-refill IPT optimizations as a primary experimental benchmark for the project.
+In these environments, the IPT contains one entry per physical frame,
+indexed via a hash of the Virtual Address and Address Space ID (ASID).
+Telix will explore whether hardware-unassisted IPTs in pure
+software-refill architectures provide a net performance benefit over
+direct ART/B+ extent tree walks, treating software-refill IPT
+optimizations as a primary experimental benchmark for the project.
 
 \section{Low-Latency Optimization: Incremental Faulting and Tail Packing}
 \label{sec:mem_latency_opt}
 
-To minimize I/O and fault latency, the proposed memory architecture incorporates two key structural mechanisms:
+To minimize I/O and fault latency, the proposed memory architecture
+incorporates two key structural mechanisms:
 
 \begin{description}
     \item[\textbf{Incremental Anonymous Memory Faulting:}] For Copy-On-Write (COW) and Zero-Fill-On-Demand (ZFOD) anonymous memory, Telix will implement incremental fault handling. Rather than allocating and zeroing full allocation blocks ($Z$) on initial access, the kernel incrementally faults sub-fragments ($K$), reducing initial fault stalls and optimizing bitblitting latency for interactive applications.
@@ -309,6 +333,344 @@ To minimize I/O and fault latency, the proposed memory architecture incorporates
 \section{Hardware Capability Bounds: CHERI and Morello}
 \label{sec:mem_cheri}
 
-The extent-based accounting used throughout the VM subsystem aligns naturally with hardware-enforced capability architectures, specifically **CHERI** and ARM Morello.
+The extent-based accounting used throughout the VM subsystem aligns naturally with hardware-enforced capability architectures, specifically \textit{CHERI} and ARM Morello.
 
 When compiled for capability hardware, Telix's software Memory Morsels (base, offset, length) will materialize directly as 128-bit hardware fat pointers. This transfers spatial memory safety enforcement from software checks to the CPU hardware pipeline, providing unforgeable, hardware-bounded memory protection for shared-memory I/O rings and Framekernel capability domains.
+
+\chapter{Memory Architecture: Sublinear Metadata, Granularity, and Design Goals}
+\label{ch:memory}
+
+Building upon the initial exploratory prototype developed in the Telix
+repository \footcite{telix_proto}, this proposal outlines a
+comprehensive redesign of the Virtual Memory (VM) and physical memory
+management subsystems. Rather than optimizing for a single metric, the
+proposed architecture reconciles a broad, disparate set of memory
+management design goals that frequently contend with one another in
+traditional operating system kernels.
+
+\section{System Design Goals for Memory Management}
+\label{sec:mem_goals}
+
+The proposed Telix memory subsystem is guided by a multi-faceted design matrix intended to solve long-standing bottlenecks in systems software:
+
+\begin{enumerate}
+    \item \textbf{Sublinear Management Metadata Footprint:} Achieving
+	    true sublinear scaling for internal bookkeeping structures
+	    by employing \emph{pervasive extent-based internal
+	    accounting} across both physical and virtual layers,
+	    eliminating boot-time-reserved static descriptor arrays
+	    (such as traditional Linux \texttt{mem\_map}).
+
+    \item \textbf{TLB Reach and Superpaging Performance:} Maximizing
+	    execution speed and minimizing hardware Translation
+	    Lookaside Buffer (TLB) misses through opportunistic
+	    superpaging, leveraging modern hardware page-size spectra.
+
+    \item \textbf{Cluster-Readiness and Distributed Support:}
+	    Accommodating process migration and distributed node
+	    topologies without requiring a full NO Remote Memory Access
+	    (NORMA) architecture. As Miloji\v{c}i\'c et al.
+	    demonstrated, full NORMA incurs prohibitive latency, leading
+	    to its general abandonment. Instead, the VM subsystem
+	    focuses on targeted cluster-wide support, such as cross-node
+	    page table invalidation and TLB shootdowns in response to
+	    file truncation or distributed replicated page unmapping.
+
+    \item \textbf{Adjusting Fragmentation Frontiers:} Utilizing
+	    ABI-preserving page clustering to tune the frontier between
+	    internal and external fragmentation, specifically
+	    guaranteeing that smaller-size superpage allocations never
+	    fail due to external memory fragmentation.
+
+    \item \textbf{Low-Latency Fault Handling and Tail Packing:} Reducing
+	    fault latency through incremental faulting strategies for
+	    Copy-On-Write (COW) and Zero-Fill-On-Demand (ZFOD) anonymous
+	    memory, alongside in-memory tail packing in the page cache
+	    for small files to optimize bitblitting and small I/O
+	    operations.
+
+    \item \textbf{Hardware Capability Integration:} Mapping
+	    software-level memory range tokens directly onto
+	    hardware-enforced capability architectures (such as CHERI
+	    and ARM Morello) to enforce spatial and temporal memory
+	    safety at hardware speeds.
+\end{enumerate}
+
+\section{ABI-Preserving Page Clustering and Fragmentation Frontiers}
+\label{sec:mem_clustering}
+
+Page clustering is frequently misunderstood as a mechanism for reducing
+virtual metadata or achieving sublinear scaling. In reality, page
+clustering achieves only a linear reduction in physical metadata in
+traditional kernel designs, while leaving virtual page table footprints
+completely unaltered. In Telix, this effect is particularly
+inconsequential because it eschews global descriptor arrays entirely.
+Rather, page clustering is intended to serve a different, highly
+strategic purpose: \textit{tuning the frontier between internal and
+external fragmentation}.
+
+\subsection{Nomenclature and Structural Abstraction}
+
+To maintain rigorous compatibility with historical literature and
+codebases, Telix adopts a unified nomenclature mapping across hardware
+granularities and historical implementations:
+
+\begin{table}[h]
+\centering
+\caption{Cross-Reference of Page Clustering Terms and Codebase Macro Equivalents}
+\label{tab:clustering_terms}
+\begin{tabularx}{0.9\textwidth}{l X X}
+\toprule
+\textbf{Concept} & \textbf{Symbol} & \textbf{Dickins / Telix Proto} \\
+\midrule
+Mapping Granularity (Hardware) & $K$ (\emph{K\"ornung}) & \texttt{MMUPAGE\_SIZE} \\
+Allocation Unit (Physical) & $Z$ (\emph{Zuteilungseinheit}) & \texttt{PAGE\_SIZE} \\
+Fragment Count per Allocation & $B$ (\emph{Bruchst\"uckanzahl}) & \texttt{PAGE\_MMUCOUNT} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Modern page clustering \footcite{chambers03clustering,
+dickins01clustering, arcangeli07clustering, shutsemau26clustering}
+strictly preserves application binary interfaces (ABIs) by keeping $K$
+as the fundamental mapping granularity. Greek equivalents of the
+letters, $\kappa$ for $K$, $\zeta$ for $Z$, $\beta$ for $B$, are
+potentially useful notations for $\mathop{\mathrm{lg}}$ (logarithm base
+2) of the relevant quantities.
+
+When Telix allocates memory, physical allocation occurs in units of $Z$.
+However, virtual memory operations continue to address individual
+$K$-sized fragments. For example, an \texttt{mmap()} targeting a
+sub-range within an allocation unit sets only the specific $K$-sized
+Page Table Entries (PTEs) corresponding to those fragments. Mapping $N$
+fragments of size $K$ within a $Z$ allocation is handled via optimized
+vector loops over the page table.
+
+\subsection{Qualitative Guarantees and Sparse Spectra ($W$)}
+
+Let $W$ (\emph{Sprungweite}) denote the jump order (logarithm of
+factor), or mathematical distance, between successive superpage sizes in
+a given architecture's hardware spectrum.
+
+Page sizes $g$ (for \foreignlanguage{german}{Seitengröße}) tend to
+follow a pattern like
+\begin{equation}
+	g_n = K\cdot 2^{W\cdot n}
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{Cross-Reference of Page Clustered Superpaging Terms and Codebase Macro Equivalents}
+\label{tab:clustering_terms}
+\begin{tabularx}{0.9\textwidth}{l X X}
+\toprule
+\textbf{Concept} & \textbf{Symbol} \\
+\midrule
+$n$-th Superpage Size & $g_n$ (\emph{Seitengröße}) \\
+Superpage Order Increment & $W$ (\emph{Sprungweite}) \\
+Superpage Increase Factor & $F$ (\emph{Sprungfaktor}) \\
+First Non-Trivial Superpage Order & $\Omega$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+Page clustering provides two distinct operational benefits depending on
+this factor:
+
+\begin{description}
+    \item[\textbf{Sparse Page Size Spectra (Large $W$):}] On
+	    architectures with a wide gap between base page sizes and
+	    the first non-trivial superpage size, page clustering acts
+	    as a bridge. However, this is treated as a trivial case: it
+	    merely shaves an additive constant off the required order of
+	    superpage allocations without changing underlying memory
+	    management algorithms. Because there tends to be exponential
+	    to double exponential drop-off in likelihood of availability
+	    with order, and at the same time the latency and internal
+	    fragmentation issues rapidly become progressively more
+	    aggravated once beyond some threshold typically
+	    significantly smaller than the first nontrivial superpage
+	    size. Decent odds can be achieved only really for orders 1,
+	    2 and to the chagrin of SPARC and Alpha partisans, maybe
+	    only sometimes 3. Hence a plausible $Z$ might be:
+\begin{eqnarray}
+Z & \approx & 2^{-\Omega} g_1
+\\
+	& \approx & K\cdot 2^{(W-\Omega)_+}
+\\
+B & \approx  & 2^{(W-\Omega)_+}
+\\
+\mathop{\mathrm{lg}}B = \beta & \approx & (W-\Omega)_+
+\end{eqnarray}
+	    where $\Omega$ can be empirically tuned and $\Omega = 2$ or
+	    $\Omega = 3$ are likely to balance success allocating
+	    superpages of the first nontrivial size $g_1$ against how
+	    intensive of internal fragmentation and latency mitigation
+	    would be required to satisfactorily perform with such a $Z$. \\
+	    However, the larger the $Z$, the more aggressive of
+	    mitigation measures for latency and internal fragmentation
+	    are needed. Initial provisional empirical results suggest
+	    ca. 256~KiB is tolerable without latency and internal
+	    fragmentation mitigation, albeit only for the sake of user
+	    interaction. Linux porting efforts also found 256~KiB
+	    required relatively minimal effort to retrofit, where
+	    exceeding $\texttt{PAGE\_SIZE} > \texttt{PMD\_SIZE}$
+	    appeared to be the qualitative difficulty threshhold,
+	    that is, where pagetable structure is truncated.
+
+    \item[\textbf{Dense Spectra and Allocation Guarantees:}] Where page
+	    clustering achieves a profound, qualitative breakthrough is
+	    for smaller superpage sizes. By maintaining physical
+	    allocations at the $Z$ boundary, Telix can \textit{guarantee
+	    that allocations for smaller-size superpages will never fail
+	    due to external fragmentation}. This eliminates the need for
+	    reserved pool strategies for those smaller superpage sizes
+	    and reduces the neeed for heavyweight, unpredictable runtime
+	    memory compaction.
+
+    \item[\textbf{Small Minimum Mapping Granularities} $K$:]
+	    There are few lower bound constraints on $K$. In principle,
+	    user PTEs need not even be smaller than the memory mapped,
+	    and pagetable space conservation techniques can enable at
+	    least one user process to run. Page clustering itself
+	    doesn't demand space for the sub-$Z$ mappings apart from the
+	    PTEs and certainly not on any sort of physical accounting
+	    basis, rendering VAX-like\index{VAX} scenarios eminently
+	    feasible to support without conflicts with advanced features.
+\end{description}
+
+\section{Pervasive Extent-Based Accounting and Coremaplessness}
+\label{sec:mem_coremapless}
+
+Sublinear physical memory management metadata is achieved in Telix not
+through clustering, but through \textit{Pervasive Extent-Based Internal
+Accounting} and true \textit{Coremaplessness}.
+
+Traditional operating systems reserve a contiguous array of physical
+page descriptors at boot time to track frame metadata. This imposes a
+severe penalty in the context of Wulf and McKee's ``Memory Wall''
+\footcite{wulf95memorywall}. In modern execution environments, CPU
+speeds vastly outpace memory access times, making cache sizes the true
+bottleneck. The global metadata arrays of legacy kernels consume
+critical cache space, putting kernel bookkeeping in direct competition
+with user workloads for L2 and L3 cache residency. TLBs typically have
+special-case kernel optimisations or otherwise have superpage sizes
+large enough to direct map physical memory into kernelspace with very
+few TLB entries, so the ``wall'' isn't a factor with the TLB.
+
+Telix intends to achieve a coremapless architecture by utilizing
+physical addresses—specifically Page Frame Numbers (PFNs) quantized by
+$Z$—as the direct, raw handles for allocation and deallocation
+operations.
+\begin{itemize}
+    \item \textbf{Dynamic Subsystem Metadata:} Rather than preallocating
+	    metadata globally for every frame, any required metadata is
+	    allocated dynamically strictly within the specific
+	    subsystems (e.g., the page cache) that need it.
+    \item \textbf{Extent-Based Indexing:} When frames are tracked within
+	    these subsystem index structures, they are not indexed as
+	    singular pages. Pervasive extent-based accounting dictates
+	    that groups of them are tracked as power-of-two sized,
+	    power-of-two aligned memory ranges.
+\end{itemize}
+
+To manage the raw physical frames underneath this accounting layer,
+Telix employs a lock-free adaptation of the \textit{LLFree} allocator
+\footcite{litz2021llfree}. The choice of LLFree is deliberate, yet
+incidental to coremaplessness itself: LLFree is utilized primarily
+because it avoids the cache misses and heavy lock contention associated
+with traditional buddy allocators (such as Linux's, which manipulates
+linked lists embedded inside the global page descriptor array). By
+relying on in-band metadata within free frames, LLFree further preserves
+the coremapless cache profile.
+
+\section{Virtual Metadata, Hardware Walkers, and Inverted Page Tables}
+\label{sec:mem_virtual_metadata}
+
+Addressing virtual memory metadata overhead presents a distinct set of
+trade-offs, dictated heavily by CPU architecture design choices.
+
+\subsection{Mitigating Hardware Page-Table Walkers}
+
+A major challenge in modern CPU design is the presence of mandatory
+hardware page-table walkers. On architectures that enforce multi-level
+hierarchical page tables (e.g., x86-64, ARM64, RISC-V), hardware walkers
+render pure Inverted Page Tables (IPT) unusable for direct hardware
+MMU fills.
+
+To mitigate virtual metadata bloat under mandatory hardware walkers,
+Telix proposes \textit{Extent-Driven Page Table Sharing}:
+\begin{itemize}
+	\item Canonical address space mappings are maintained
+		independently of the hardware page tables in highly
+		compressed software structures, combining
+		\textit{Adaptive Radix Trees (ART)} (for dense extents)
+		and \textit{B+ Trees} (for sparse ranges).
+    \item While these software structures were initially conceived for
+	    pure software-refill architectures, they provide a powerful
+		coordination layer for mitigating hardware walkers. By
+		using the ART/B+ trees to canonicalize large memory
+		ranges, the OS can easily identify massive contiguous
+		shared regions.
+    \item Telix leverages this software extent knowledge to safely link
+	    or clone the actual underlying hardware page table sub-trees
+		across multiple processes. This allows thousands of
+		processes to share a shared library or IPC ring while
+		sharing the physical PTE structures, drastically
+		reducing virtual memory footprints.
+    \item To avoid cache-line contention and lock bottlenecks on
+	    multi-core systems, shared page table nodes will employ
+		localized replication mechanisms.
+\end{itemize}
+
+\subsection{Inverted Page Tables and Software-Refill Architectures}
+
+On CPU architectures featuring software-managed TLB refills (e.g., MIPS,
+software-refill RISC-V profiles) or native hardware IPT support (e.g.,
+64-bit SPARC, IA-64 Virtual Hash Page Tables [VHPT], and IBM POWER
+Hashed Page Tables [HPT] and Segment Lookaside Buffers [SLB]), Telix
+will actively utilize Inverted Page Tables.
+
+In these environments, the IPT contains one entry per physical frame,
+indexed via a hash of the Virtual Address and Address Space ID (ASID).
+Telix will explore whether hardware-unassisted IPTs in pure
+software-refill architectures provide a net performance benefit over
+direct ART/B+ extent tree walks, treating software-refill IPT
+optimisations as a primary experimental benchmark for the project.
+
+\section{Low-Latency Optimization: Incremental Faulting and Tail Packing}
+\label{sec:mem_latency_opt}
+
+To minimize I/O and fault latency, the proposed memory architecture
+incorporates two key structural mechanisms:
+
+\begin{description}
+    \item[\textbf{Incremental Anonymous Memory Faulting:}] For
+	    Copy-On-Write (COW) and Zero-Fill-On-Demand (ZFOD) anonymous
+		memory, Telix will implement incremental fault handling.
+		Rather than allocating and zeroing full allocation
+		blocks ($Z$) on initial access, the kernel incrementally
+		faults sub-fragments ($K$), reducing initial fault
+		stalls and optimizing bitblitting latency for
+		interactive applications.
+
+    \item[\textbf{In-Memory Tail Packing:}] Small files and trailing
+	    file fragments in the page cache frequently waste memory due
+	    to internal alignment padding. Telix plans to support
+	    in-memory tail packing, packing sub-page file tails into
+	    shared physical frames to maximize cache efficiency and
+	    reduce storage bus pressure.
+\end{description}
+
+\section{Hardware Capability Bounds: CHERI and Morello}
+\label{sec:mem_cheri}
+
+The extent-based accounting used throughout the VM subsystem aligns
+naturally with hardware-enforced capability architectures, specifically
+\textit{CHERI} and ARM Morello.
+
+When compiled for capability hardware, Telix's software Memory Morsels
+(base, offset, length) will materialize directly as 128-bit hardware fat
+pointers. This transfers spatial memory safety enforcement from software
+checks to the CPU hardware pipeline, providing unforgeable,
+hardware-bounded memory protection for shared-memory I/O rings and
+Framekernel capability domains.
