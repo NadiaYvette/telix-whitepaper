@@ -1,13 +1,13 @@
 \chapter{Memory Architecture: Sublinear Metadata, Granularity, and Design Goals}
 \label{ch:memory}
 
-Building upon the initial exploratory prototype developed in the Telix
-\index{Telix} repository\footcite{telix_proto}, this proposal outlines a
-comprehensive redesign of the Virtual Memory (VM) and physical memory
-management subsystems. Rather than optimizing for a single metric, the
-proposed architecture reconciles a broad, disparate set of memory
-management design goals that frequently contend with one another in
-traditional operating system kernels.
+Building upon the initial exploratory prototype developed in the
+Telix\index{Telix} repository\footcite{telix_proto}, this proposal
+outlines a comprehensive redesign of the Virtual Memory (VM) and
+physical memory management subsystems. Rather than optimizing for a
+single metric, the proposed architecture reconciles a broad, disparate
+set of memory management design goals that frequently contend with one
+another in traditional operating system kernels.
 
 \section{System Design Goals for Memory Management}
 \label{sec:mem_goals}
@@ -26,22 +26,22 @@ and issues in systems software:
 	    \index{mem_map@\texttt{mem\_map}}).
 
     \item \textbf{TLB\index{TLB} Reach and Superpaging
-	    \index{superpaging} Performance:} Maximizing
-	    execution speed and minimizing hardware Translation
-	    Lookaside Buffer (TLB\index{TLB}) misses through
-	    opportunistic superpaging, leveraging modern hardware
-	    {page size spectra}\index{page size spectrum}.
+	    \index{superpaging} Performance:} Maximizing execution speed
+	    and minimizing hardware Translation Lookaside Buffer
+	    (TLB\index{TLB}) misses through opportunistic superpaging,
+	    leveraging modern hardware {page size spectra}
+	    \index{page size spectrum}.
 
-    \item \textbf{Cluster-Readiness\index{cluster} and Distributed Support:}
-	    Accommodating process migration and distributed node
-	    topologies without requiring a full NO Remote Memory Access
-	    (NORMA\index{NORMA}) architecture. As Miloji\v{c}i\'c et al.
-	    demonstrated, full NORMA\index{NORMA} incurs prohibitive
-	    latency, leading to its general abandonment. Instead, the VM
-	    subsystem focuses on targeted cluster-wide support, such as
-	    cross-node page mapping invalidations and TLB\index{TLB}
-	    shootdowns in response to file truncation or distributed
-	    replicated page unmapping.
+    \item \textbf{Cluster-Readiness\index{cluster} and Distributed
+	    Support:} Accommodating process migration and distributed
+	    node topologies without requiring a full NO Remote Memory
+	    Access (NORMA\index{NORMA}) architecture. As Miloji\v{c}i\'c
+	    et al. demonstrated, full NORMA\index{NORMA} incurs
+	    prohibitive latency, leading to its general abandonment.
+	    Instead, the VM subsystem focuses on targeted cluster-wide
+	    support, such as cross-node page mapping invalidations and
+	    TLB\index{TLB} shootdowns in response to file truncation or
+	    distributed replicated page unmapping.
 
     \item \textbf{Adjusting Fragmentation\index{fragmentation}
 	    Frontiers:} Utilizing ABI-preserving {page clustering}
@@ -72,25 +72,25 @@ and issues in systems software:
 
 {Page clustering}\index{page clustering} is frequently misunderstood as
 a mechanism for reducing virtual metadata or achieving sublinear
-scaling and sometimes to be more directly related to superpaging
-\index{superpaging} than it actually is. In reality, {page clustering}
+scaling, and is sometimes incorrectly assumed to be inextricably linked
+to superpaging\index{superpaging}. In reality, {page clustering}
 \index{page clustering} achieves only a linear reduction in physical
 metadata in traditional kernel designs, while leaving virtual
 {page table}\index{page table} footprints completely unaltered. In
-Telix'\index{Telix} design, the {page descriptor}\index{page descriptor}
-memory footprint reduction effect is particularly inconsequential
-because it eschews global descriptor arrays entirely. Rather,
-{page clustering}\index{page clustering} is intended to serve a
-different, highly strategic purpose: \textit{tuning the frontier between
-internal\index{fragmentation!internal} and {external fragmentation}
+Telix's\index{Telix} design, the {page descriptor}
+\index{page descriptor} memory footprint reduction effect is
+particularly inconsequential because the architecture eschews global
+descriptor arrays entirely. Rather, {page clustering}
+\index{page clustering} is intended to serve a different, highly
+strategic purpose: \textit{tuning the frontier between internal
+\index{fragmentation!internal} and {external fragmentation}
 \index{fragmentation!external}}.
 
 \subsection{Nomenclature and Structural Abstraction}
 
 To maintain rigorous compatibility with historical literature and
-codebases, this document about Telix'\index{Telix} proposed design
-adopts a unified nomenclature mapping across hardware granularities and
-historical implementations:
+codebases, this document adopts a unified nomenclature mapping across
+hardware granularities and historical implementations:
 
 \begin{table}[h]
 \centering
@@ -111,10 +111,9 @@ Modern {page clustering}\index{page clustering}
 \footcite{chambers03clustering, dickins01clustering,
 arcangeli07clustering, shutsemau26clustering} strictly preserves
 application binary interfaces (ABIs\index{ABI}) by keeping $K$ as the
-fundamental mapping granularity. Greek equivalents of the letters,
-$\kappa$ for $K$, $\zeta$ for $Z$, $\beta$ for $B$, are potentially
-useful notations for $\mathop{\mathrm{lg}}$ (logarithm base 2) of the
-relevant quantities.
+fundamental mapping granularity. For analytical purposes, we adopt the
+Greek equivalents ($\kappa$, $\zeta$, $\beta$) to denote the base-2
+logarithms ($\lg$) of these respective quantities.
 
 When Telix allocates memory, physical allocation occurs in units of $Z$.
 However, virtual memory operations continue to address individual
@@ -126,22 +125,22 @@ vector loops over the page table.
 
 \subsection{Qualitative Guarantees and Sparse Spectra ($W$)}
 
-Let $W$ (\emph{Sprungweite}) denote the jump order (logarithm of
+Let $W$ (\emph{Sprungweite}) denote the jump order (the logarithm of the
 factor), or mathematical distance, between successive superpage
-\index{superpaging} sizes in a given architecture's hardware
-{page size spectrum}\index{page size spectrum}.
+\index{superpaging} sizes in a given architecture's hardware {page size
+spectrum}\index{page size spectrum}.
 
-Page sizes $g$ (for \foreignlanguage{german}{Seitengröße}) tend to
-follow a pattern like
+Page sizes $g$ (for \foreignlanguage{german}{Seitengröße}) generally
+follow the pattern:
 \begin{equation}
-	g_n = K\cdot 2^{W\cdot n}
+    g_n = K \cdot 2^{W \cdot n}
 \end{equation}
 
 \begin{table}[h]
 \centering
 \caption{Cross-Reference of Page Clustered Superpaging Terms and Codebase Macro Equivalents}
-\label{tab:clustering_terms}
-\begin{tabularx}{0.9\textwidth}{l X X}
+\label{tab:superpaging_terms}
+\begin{tabularx}{0.9\textwidth}{l X}
 \toprule
 \textbf{Concept} & \textbf{Symbol} \\
 \midrule
@@ -152,8 +151,9 @@ First Non-Trivial Superpage Order & $\Omega$ \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
 {Page clustering}\index{page clustering} provides two distinct
-operational benefits depending on this factor:
+operational benefits depending on this spectrum:
 
 \begin{description}
     \item[\textbf{{Sparse Page Size Spectra}
@@ -163,113 +163,118 @@ operational benefits depending on this factor:
 	    as a bridge. However, this is treated as a trivial case: it
 	    merely shaves an additive constant off the required order of
 	    superpage allocations without changing underlying memory
-	    management algorithms. Because there tends to be exponential
-	    to double exponential drop-off in likelihood of availability
-	    with order, and at the same time the latency and internal
-	    fragmentation issues rapidly become progressively more
-	    aggravated once beyond some threshold typically
-	    significantly smaller than the first nontrivial superpage
-	    size. Decent odds can be achieved only really for orders 1,
-	    2 and to the chagrin of SPARC\index{SPARC} and Alpha
-	    \index{Alpha} partisans, maybe only sometimes 3. Hence a
-	    plausible $Z$ might be:
-\begin{eqnarray}
-Z & \approx & 2^{-\Omega} g_1
-\\
-	& \approx & K\cdot 2^{(W-\Omega)_+}
-\\
-B & \approx  & 2^{(W-\Omega)_+}
-\\
-\mathop{\mathrm{lg}}B = \beta & \approx & (W-\Omega)_+
-\end{eqnarray}
-	    where $\Omega$ can be empirically tuned and $\Omega = 2$ or
-	    $\Omega = 3$ are likely to balance success allocating
-	    superpages of the first nontrivial size $g_1$ against how
-	    intensive of internal fragmentation and latency mitigation
-	    would be required to satisfactorily perform with such a $Z$. \\
-	    However, the larger the $Z$, the more aggressive of
-	    mitigation measures for latency and internal fragmentation
-	    are needed. Initial provisional empirical results suggest
-	    ca. 256~KiB is tolerable without latency and internal
-	    fragmentation mitigation, albeit only for the sake of user
-	    interaction. Linux porting efforts also found 256~KiB
-	    required relatively minimal effort to retrofit, where
-	    exceeding $\texttt{PAGE\_SIZE} > \texttt{PMD\_SIZE}$
-	    appeared to be the qualitative difficulty threshhold,
-	    that is, where pagetable structure is truncated.
+	    management algorithms.
+
+    The availability of contiguous physical frames exhibits an
+	exponential (or even double-exponential) drop-off as the
+	superpage order increases. Simultaneously, latency and internal
+	fragmentation penalties scale aggressively beyond a threshold
+	that is typically much smaller than the first non-trivial
+	hardware superpage size. Consequently, reliable allocation is
+	practically limited to the first few orders ($n \in \{1, 2\}$) —
+	and occasionally order 3, despite the historical preferences of
+	SPARC\index{SPARC} and Alpha\index{Alpha} partisans. Hence, a
+	plausible $Z$ might be defined as:
+
+\begin{align}
+    Z &\approx 2^{-\Omega} g_1 \\
+      &\approx K \cdot 2^{(W-\Omega)_+} \\
+    B &\approx 2^{(W-\Omega)_+} \\
+    \mathop{\mathrm{lg}}B = \beta &\approx (W-\Omega)_+
+\end{align}
+
+    Here, $\Omega$ can be empirically tuned (where $\Omega = 2$ or
+	$\Omega = 3$ are likely optimal) to balance the success rate of
+	allocating superpages of the first nontrivial size ($g_1$)
+	against the intensive latency mitigation and internal
+	fragmentation management required to support such a $Z$. The
+	larger the $Z$, the more aggressive these mitigation measures
+	must be. Provisional empirical results suggest approximately
+	256~KiB is tolerable without dedicated mitigation, albeit
+	primarily for interactive user workloads. Historical Linux
+	porting efforts also found 256~KiB required minimal retrofit
+	effort, whereas exceeding the Page Middle Directory size
+	($\texttt{PAGE\_SIZE} > \texttt{PMD\_SIZE}$) introduced
+	qualitative difficulties due to the truncation of the page table
+	hierarchy.
 
     \item[\textbf{{Dense Spectra}\index{page size spectrum!dense} and
 	    Allocation Guarantees:}] Where {page clustering}
-	    \index{page clustering} achieves a profound, qualitative
-	    breakthrough is for smaller superpage\index{superpaging}
-	    sizes. By maintaining physical allocations at the $Z$
-	    boundary, Telix\index{Telix} can \textit{guarantee that
-	    allocations for smaller-size superpages will never fail
-	    due to external fragmentation}. This eliminates the need for
-	    reserved pool strategies for those smaller superpage sizes
-	    like those of {HP-UX}\index{HP-UX} and reduces the need for
-	    heavyweight, unpredictable runtime memory compaction as
-	    sometimes has afflicted Linux\index{Linux}.
+		\index{page clustering} achieves a profound, qualitative
+		breakthrough is for smaller superpage\index{superpaging}
+		sizes. By maintaining physical allocations at the $Z$
+		boundary, Telix\index{Telix} can \textit{guarantee that
+		allocations for smaller-size superpages will never fail
+		due to external fragmentation}. This eliminates the need
+		for reserved pool strategies for smaller superpage sizes
+		(such as those used in {HP-UX}\index{HP-UX}) and reduces
+		the need for the heavyweight, unpredictable runtime
+		memory compaction that has occasionally afflicted Linux
+		\index{Linux}.
 
-    \item[\textbf{Small Minimum Mapping Granularities} $K$:]
-	    There are few lower bound constraints on $K$. In principle,
-	    user PTEs need not even be smaller than the memory mapped,
-	    and pagetable space conservation techniques can enable at
-	    least one user process to run. Page clustering itself
-	    doesn't demand space for the sub-$Z$ mappings apart from the
-	    PTEs and certainly not on any sort of physical accounting
-	    basis, rendering VAX-like\index{VAX} scenarios eminently
-	    feasible to support without conflicts with advanced features.
-	    The 1~KiB {MIPS\index{MIPS} \texttt{PageGrain} extension}
-	    \index{PageGrain@\texttt{PageGrain} extension (MIPS)} is
-	    the most plausible hardware support vehicle for
-	    demonstrating the range of mapping granularities
-	    supportable.
+    \item[\textbf{Small Minimum Mapping Granularities ($K$):}] There are
+	    few lower-bound constraints on $K$. In principle, user PTEs
+		need not even be smaller than the mapped memory; page
+		table space conservation techniques can enable at least
+		one user process to run effectively. Page clustering
+		itself does not demand space for sub-$Z$ mappings apart
+		from the PTEs, and certainly not on any physical
+		accounting basis, rendering VAX-like\index{VAX}
+		scenarios eminently feasible without conflicting with
+		advanced architectural features. The 1~KiB
+		{MIPS\index{MIPS} \texttt{PageGrain} extension}
+		\index{PageGrain@\texttt{PageGrain} extension (MIPS)}
+		serves as the most plausible hardware support vehicle
+		for demonstrating the extreme range of supportable
+		mapping granularities.
 \end{description}
 
 \section{Pervasive Extent-Based Accounting and Coremaplessness}
 \label{sec:mem_coremapless}
 
-Sublinear physical memory management metadata is achieved in Telix not
-through clustering, but through \textit{Pervasive Extent-Based Internal
-Accounting} and true \textit{Coremaplessness}.
+Sublinear physical memory management metadata is achieved in Telix
+\index{Telix} not through {page clustering}\index{page clustering}, but
+through \textit{Pervasive Extent-Based Internal Accounting} and true
+\textit{Coremaplessness}.
 
 Traditional operating systems reserve a contiguous array of physical
-page descriptors at boot time to track frame metadata. This imposes a
-severe penalty in the context of Wulf and McKee's ``Memory Wall''
-\footcite{wulf95memorywall}. In modern execution environments, CPU
-speeds vastly outpace memory access times, making cache sizes the true
-bottleneck. The global metadata arrays of legacy kernels consume
-critical cache space, putting kernel bookkeeping in direct competition
-with user workloads for L2 and L3 cache residency. TLBs typically have
-special-case kernel optimisations or otherwise have superpage sizes
-large enough to direct map physical memory into kernelspace with very
-few TLB entries, so the ``wall'' isn't a factor with the TLB.
+{page descriptors}\index{page descriptor} at boot time to track frame
+metadata. This imposes a severe penalty in the context of Wulf and
+McKee's ``Memory Wall''\footcite{wulf95memorywall}. In modern execution
+environments, CPU speeds vastly outpace memory access times, making
+cache sizes the true bottleneck. The global metadata arrays of legacy
+kernels consume critical cache space, putting kernel bookkeeping in
+direct competition with user workloads for L2 and L3 cache residency.
+Because TLBs\index{TLB} typically feature kernel-specific optimizations
+or support superpages\index{superpaging} large enough to direct-map
+physical memory with minimal entries, the ``Memory Wall'' is primarily a
+cache-pressure phenomenon rather than a TLB\index{TLB} bottleneck.
 
-Telix intends to achieve a coremapless architecture by utilizing
-physical addresses—specifically Page Frame Numbers (PFNs) quantized by
-$Z$—as the direct, raw handles for allocation and deallocation
-operations.
+Telix\index{Telix} intends to achieve a coremapless architecture by
+utilizing physical addresses—specifically {Page Frame Numbers (PFNs)}
+\index{page frame number} quantized by $Z$—as the direct, raw handles
+for allocation and deallocation operations.
 \begin{itemize}
     \item \textbf{Dynamic Subsystem Metadata:} Rather than preallocating
 	    metadata globally for every frame, any required metadata is
-	    allocated dynamically strictly within the specific
-	    subsystems (e.g., the page cache) that need it.
+		allocated dynamically strictly within the specific
+		subsystems (e.g., the page cache) that need it.
     \item \textbf{Extent-Based Indexing:} When frames are tracked within
 	    these subsystem index structures, they are not indexed as
-	    singular pages. Pervasive extent-based accounting dictates
-	    that groups of them are tracked as power-of-two sized,
-	    power-of-two aligned memory ranges.
+		singular pages. Pervasive extent-based accounting
+		dictates that groups of them are tracked as power-of-two
+		sized, power-of-two aligned memory ranges.
 \end{itemize}
 
 To manage the raw physical frames underneath this accounting layer,
-Telix employs a lock-free adaptation of the \textit{LLFree} allocator
-\footcite{litz2021llfree}. The choice of LLFree is deliberate, yet
-incidental to coremaplessness itself: LLFree is utilized primarily
-because it avoids the cache misses and heavy lock contention associated
-with traditional buddy allocators (such as Linux's, which manipulates
-linked lists embedded inside the global page descriptor array). By
-relying on in-band metadata within free frames, LLFree further preserves
+Telix\index{Telix} employs a lock-free adaptation of the \textit{LLFree}
+\index{LLFree@\texttt{LLFree}} allocator\footcite{litz2021llfree}. The
+choice of \texttt{LLFree} is deliberate, yet incidental to
+coremaplessness itself: \texttt{LLFree} is utilized primarily because it
+avoids the cache misses and heavy lock contention associated with
+traditional buddy allocators (such as Linux's, which manipulates linked
+lists embedded inside the global page descriptor array). By relying on
+in-band metadata within free frames, \texttt{LLFree} further preserves
 the coremapless cache profile.
 
 \section{Virtual Metadata, Hardware Walkers, and Inverted Page Tables}
@@ -283,17 +288,17 @@ trade-offs, dictated heavily by CPU architecture design choices.
 A major challenge in modern CPU design is the presence of mandatory
 hardware page-table walkers. On architectures that enforce multi-level
 hierarchical page tables (e.g., x86-64, ARM64, RISC-V), hardware walkers
-render pure Inverted Page Tables (IPT) unusable for direct hardware
-MMU fills.
+render pure Inverted Page Tables (IPT) unusable for direct hardware MMU
+fills.
 
 To mitigate virtual metadata bloat under mandatory hardware walkers,
-Telix proposes \textit{Extent-Driven Page Table Sharing}:
+Telix\index{Telix} proposes \textit{Extent-Driven Page Table Sharing}:
 \begin{itemize}
-	\item Canonical address space mappings are maintained
-		independently of the hardware page tables in highly
-		compressed software structures, combining
-		\textit{Adaptive Radix Trees (ART)} (for dense extents)
-		and \textit{B+ Trees} (for sparse ranges).
+    \item Canonical address space mappings are maintained independently
+	    of the hardware page tables in highly compressed software
+		structures, combining \textit{Adaptive Radix Trees
+		(ART)} (for dense extents) and \textit{B+ Trees} (for
+		sparse ranges).
     \item While these software structures were initially conceived for
 	    pure software-refill architectures, they provide a powerful
 		coordination layer for mitigating hardware walkers. By
@@ -324,7 +329,7 @@ indexed via a hash of the Virtual Address and Address Space ID (ASID).
 Telix will explore whether hardware-unassisted IPTs in pure
 software-refill architectures provide a net performance benefit over
 direct ART/B+ extent tree walks, treating software-refill IPT
-optimisations as a primary experimental benchmark for the project.
+optimizations as a primary experimental benchmark for the project.
 
 \section{Low-Latency Optimization: Incremental Faulting and Tail Packing}
 \label{sec:mem_latency_opt}
@@ -344,10 +349,10 @@ incorporates two key structural mechanisms:
 
     \item[\textbf{In-Memory Tail Packing:}] Small files and trailing
 	    file fragments in the page cache frequently waste memory due
-	    to internal alignment padding. Telix plans to support
-	    in-memory tail packing, packing sub-page file tails into
-	    shared physical frames to maximize cache efficiency and
-	    reduce storage bus pressure.
+		to internal alignment padding. Telix plans to support
+		in-memory tail packing, packing sub-page file tails into
+		shared physical frames to maximize cache efficiency and
+		reduce storage bus pressure.
 \end{description}
 
 \section{Hardware Capability Bounds: CHERI and Morello}
@@ -364,23 +369,23 @@ checks to the CPU hardware pipeline, providing unforgeable,
 hardware-bounded memory protection for shared-memory I/O rings and
 Framekernel capability domains.
 
-% While this is about the management of kernel address space(s) rather
-% than user address spaces, some kind of discussion is worth having
-% about it, as it relates to virtual memory.
-% There may be some way elaboration is needed on this topic.
-\section{Framekernels, Multikernels and Address Spaces}
+\section{Framekernels, Multikernels, and Address Spaces}
+\label{sec:mem_address_spaces}
 
-Asterinas'\index{Asterinas} framekernel\index{framekernel}
-\footcite{peng24} method shares a kernel address space within the
-lowest-level domains it covers. Barrelfish's\index{Barrelfish}
-multikernel\index{multikernel}\footcite{baum09} in turn uses separate
-kernel address spaces for the domains it manages. Telix is intended to
-leverage the multikernel\index{multikernel} tactic to ``softly
-quasi-partition'' SSI (Single System Image)
-\index{SSI (Single System Image)} nodes of a cluster\index{cluster} to
-domains within which scalability\index{scalability} is feasible or
-otherwise more manageable. Within the ``soft quasi-partitions'', the
-framekernel\index{framekernel} strategy is then used to reduce the
-overheads microkernels\index{microkernel} might potentially suffer from
-{address space}\index{address space} switching and forms of IPC
-\index{IPC} demanding such.
+Asterinas's\index{Asterinas} framekernel\index{framekernel}
+\footcite{peng24} methodology shares a single kernel address space
+across the lowest-level domains it covers. Conversely, Barrelfish's
+\index{Barrelfish} multikernel\index{multikernel}\footcite{baum09}
+utilizes strictly separate kernel address spaces for the domains it
+manages.
+
+Telix leverages the multikernel\index{multikernel} approach to establish
+``soft partitions'' across the nodes of a Single System Image (SSI)
+\index{SSI (Single System Image)} cluster, geographically bounding
+domains within which scalability\index{scalability} remains physically
+and computationally feasible. Within these soft partitions, Telix
+subsequently adopts the framekernel\index{framekernel} strategy. This
+hybrid construction mitigates the overheads typically suffered by
+microkernels\index{microkernel}, specifically eliminating the expensive
+{address space}\index{address space} context switches required by
+traditional isolation-heavy IPC\index{IPC} mechanisms.
