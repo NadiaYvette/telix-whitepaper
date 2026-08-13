@@ -3,14 +3,53 @@
 There should be something more detailed to say here, but this is as much
 as has been written thus far.
 
-\section{Framekernels: Continuations and State Machines}
+The control plane is complicated by adaptations to cover 4 domains:
+\section{Within multikernel\index{multikernel}
+		\footcite{baum09} domain framekernel\index{framekernel}
+		\footcite{peng24} TCB shared address space direct
+		continuation call}
+% \section{Within Framekernel Domains: Continuations and State Machines}
 
 Rust appears to have a way to support continuation-passing style.
 Within a framekernel domain, state machines and continuations are the
 fundamental control flow dispatch mechanism.
 
-\section{Multikernels: Network Protocol Like Message Passing}
+		Microkernel minimality limits the scope of applicability
+		here, which may be for the best, because manually
+		managing continuation state is burdensome.
+
+\section{Kernel-user FlexSC-like\index{FlexSC}\footcite{soar10}
+		mapped ring}
+% \section{Within Multikernel Domains: Network Protocol Like Message Passing}
 
 Between the multikernel's partitions or subdomains, microkernel-style
 message passing is handled in an explicitly network protocol handling
 -oriented fashion.
+		Most things dealt with by conventional monolithic
+		kernels are done via ``userspace'' processes, which then
+		involve the syscall API/ABI. The scare quotes are
+		because these typically involve highly elevated
+		privileges in order to manipulate pagetables
+		\index{pagetable} and execute privileged instructions to
+		do things like fill the TLB\index{TLB}.
+
+\section{Between multikernel\index{multikernel} domain zero copy
+		network-like IPC}
+% \section{Within Cluster Nodes: Zero Copy IPC}
+
+		Given that these are meant to align with NUMA
+		\index{NUMA} nodes or small, topologically nearby groups
+		thereof, a ``remote'' access penalty might be taken, but
+		of vastly smaller magnitude than for remote cluster
+		\index{cluster} nodes.
+
+\section{Between Cluster\index{clustering} Nodes: Network-Transparent IPC}
+
+		While it's possible to take advantage of shared memory
+		that's otherwise largely been partitioned to, say, do
+		zero copy data transfer between multikernel
+		\index{multikernel} domains typically aligned with
+		NUMA\index{NUMA} nodes, cluster\index{clustering} nodes
+		are another matter entirely and there's no way to avoid
+		having to do much slower sorts of IO operations to
+		transmit the data between the nodes.
