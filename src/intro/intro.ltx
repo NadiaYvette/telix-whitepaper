@@ -21,14 +21,14 @@ Telix synthesizes its architectural foundation around four primary
 domain goals:
 
 \begin{description}
-    \item[Formal Verification:] Formally verify via Coq/Rocq or other
+    \item[Formal Verification:] Formally verify via \CoqRocq\ or other
 	    theorem provers.
 
     \item[Hardware Partitioning and Safety Domain Isolation:] Systems
 	    are partitioned per the Barrelfish multikernel model
 	    \footfullcite{baum09} into decoupled message-passing nodes.
 	    Within each multikernel partition, shared-memory domains
-	    utilize the \Asterinas \framekernel architecture
+	    utilize the \Asterinas\ \framekernel\ architecture
 	    \footfullcite{peng24} to enforce safe Rust-based
 	    intra-kernel privilege separation alongside formal
 	    verification principles derived from \seLFour
@@ -44,11 +44,11 @@ domain goals:
 	    physical memory size. Telix combines superpaging
 	    \footfullcite{nava02}, shared page tables
 	    \footfullcite{ko03}, software-managed inverted page tables
-	    \footfullcite{tall95, huck93}, and BSD/Linux page clustering
-	    algorithms \footfullcite{baba79, dick01}. Additionally,
-	    traditional page descriptor arrays are eliminated by
-	    adapting main-memory database morsel-driven allocation
-	    \footfullcite{kemp14}.
+	    \footfullcite{tall95, huck93}, and BSD/Linux
+	    \pageclustering\ algorithms \footfullcite{baba79, dick01}.
+	    Additionally, traditional page descriptor arrays are
+	    eliminated by adapting main-memory database morsel-driven
+	    allocation\footfullcite{kemp14}.
 
     \item[Hybrid Workload Co-Scheduling:] Thread execution uses $M:N$
 	    threading via Scheduler Activations \footfullcite{ande92}
@@ -119,7 +119,7 @@ Some potential further ports might be to:
 	\item[PA-RISC:]
 	\item[POWER:]
 	\item[SPARC:] Beauty incarnated as a microprocessor.
-	\item[VAX:] The full 512~B page size page clustering experience.
+	\item[VAX:] The full 512~B page size \pageclustering\ experience.
 \end{description}
 
 \section{Hardware Acceleration and Architectural Extensions}

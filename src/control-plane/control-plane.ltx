@@ -3,19 +3,19 @@
 A cluster node is the largest unit of hierarchy: one machine's worth of
 sockets, cores, memory, and devices. That machine is partitioned along
 NUMA boundaries into independent kernel instances that coordinate by
-message passing — a Barrelfish-style multikernel, but with the instance
-resized from the core to the NUMA node. Each instance is a microkernel
-whose trusted core is a framekernel: a single main-kernel address space
-written in the interrupt, continuation-passing style. The framekernel
-boundary sits deliberately between \Asterinas and \seLFour/\Mach: it
-absorbs more of the server set than a classic microkernel would, but —
-unlike strict \Asterinas — it does not pull every microkernel server
-into the main kernel address space, so the remaining servers keep their
-own address spaces. The boundary is drawn by programming discipline
-rather than by an absolute no-blocking rule: code inside the
-\framekernel runs as interrupt-driven state machines, while work that
-crosses into a userspace server switches to the task model and enters
-through a FlexSC/\iouring-style completion interface.
+message passing — a \Barrelfish-style \multikernel, but with the
+instance resized from the core to the NUMA node. Each instance is a
+\microkernel\ whose trusted core is a \framekernel: a single main-kernel
+address space written in the interrupt, continuation-passing style. The
+\framekernel\ boundary sits deliberately between \Asterinas\ and
+\seLFour/\Mach: it absorbs more of the server set than a classic
+\microkernel\ would, but — unlike strict \Asterinas\ — it does not pull
+every \microkernel\ server into the main kernel address space, so the
+remaining servers keep their own address spaces. The boundary is drawn
+by programming discipline rather than by an absolute no-blocking rule:
+code inside the \framekernel\ runs as interrupt-driven state machines,
+while work that crosses into a userspace server switches to the task
+model and enters through a FlexSC/\iouring-style completion interface.
 
 % Preamble requirements (add if missing):
 %   \usepackage{tikz}

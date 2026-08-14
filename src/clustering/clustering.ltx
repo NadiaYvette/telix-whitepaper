@@ -3,7 +3,11 @@
 
 As computing environments shift from isolated monolithic hosts to hyper-connected Personal Area Networks (PANs), micro-edge clusters, and disaggregated NUMA topologies, operating systems must treat distribution as a first-class execution primitive.
 
-While platforms like OpenHarmony \footcite{openharmony23} and Fuchsia \footcite{fuchsia_zircon} provide high-level distributed service buses over heavy user-space IPC, Telix unifies single-node multikernel partitions and multi-device PAN topologies under a single explicit capability-driven message-passing control plane.
+While platforms like OpenHarmony \footcite{openharmony23} and Fuchsia
+\footcite{fuchsia_zircon} provide high-level distributed service buses
+over heavy user-space IPC, Telix unifies single-node
+\multikernel\ partitions and multi-device PAN topologies under a single
+explicit capability-driven message-passing control plane.
 
 \section{System Positioning: Heterogeneous Edge \& PAN Topologies}
 \label{sec:clustering_positioning}
@@ -35,8 +39,8 @@ Networking in a Telix cluster is decoupled from physical interface ownership. So
 
 \subsection{Transparent Socket Migration}
 Instead of pinning a socket to a specific node's TCP/IP stack:
-1. Sockets are registered as virtual channels within the multikernel transport routing layer.
-2. Packet processing queues are exposed as memory-mapped submission and completion rings (\texttt{io\_uring}-style).
+1. Sockets are registered as virtual channels within the \multikernel\ transport routing layer.
+2. Packet processing queues are exposed as memory-mapped submission and completion rings (\iouring-style).
 3. When a device moves across physical PAN access points, the socket continuation state remains active while the underlying ring buffer transport re-binds to the new physical link layer without dropping protocol connection state.
 
 \section{Process and Continuation State Migration}

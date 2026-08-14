@@ -44,12 +44,11 @@ and issues in systems software:
 	    distributed replicated page unmapping.
 
     \item \textbf{Adjusting Fragmentation\index{fragmentation}
-	    Frontiers:} Utilizing ABI-preserving {page clustering}
-	    \index{page clustering} to tune the frontier between
-	    internal\index{fragmentation!internal} and external
-	    \index{fragmentation!external} fragmentation
-	    \index{fragmentation}, specifically guaranteeing that
-	    smaller-size superpage\index{superpaging} allocations never
+	    Frontiers:} Utilizing ABI-preserving
+	    \pageclustering\ to tune the frontier between
+	    internal\index{fragmentation!internal} and
+	    \externalfragmentation, specifically guaranteeing that
+	    smaller-size \superpage\ allocations never
 	    fail due to {external memory fragmentation}
 	    \index{fragmentation!external}.
 
@@ -73,15 +72,15 @@ and issues in systems software:
 {Page clustering}\index{page clustering} is frequently misunderstood as
 a mechanism for reducing virtual metadata or achieving sublinear
 scaling, and is sometimes incorrectly assumed to be inextricably linked
-to superpaging\index{superpaging}. In reality, {page clustering}
-\index{page clustering} achieves only a linear reduction in physical
+to superpaging\index{superpaging}. In reality,
+\pageclustering\ achieves only a linear reduction in physical
 metadata in traditional kernel designs, while leaving virtual
 {page table}\index{page table} footprints completely unaltered. In
 Telix's\index{Telix} design, the {page descriptor}
 \index{page descriptor} memory footprint reduction effect is
 particularly inconsequential because the architecture eschews global
-descriptor arrays entirely. Rather, {page clustering}
-\index{page clustering} is intended to serve a different, highly
+descriptor arrays entirely. Rather,
+\pageclustering\ is intended to serve a different, highly
 strategic purpose: \textit{tuning the frontier between internal
 \index{fragmentation!internal} and {external fragmentation}
 \index{fragmentation!external}}.
@@ -107,7 +106,7 @@ Fragment Count per Allocation & $B$ (\emph{Bruchst\"uckanzahl}) & \texttt{PAGE\_
 \end{tabularx}
 \end{table}
 
-Modern {page clustering}\index{page clustering}
+Modern \pageclustering
 \footcite{chambers03clustering, dickins01clustering,
 arcangeli07clustering, shutsemau26clustering} strictly preserves
 application binary interfaces (ABIs\index{ABI}) by keeping $K$ as the
@@ -159,7 +158,7 @@ operational benefits depending on this spectrum:
     \item[\textbf{{Sparse Page Size Spectra}
 	    \index{page size spectrum!sparse} (Large $W$):}] On
 	    architectures with a wide gap between base page sizes and
-	    the first non-trivial superpage size, page clustering acts
+	    the first non-trivial superpage size, \pageclustering\ acts
 	    as a bridge. However, this is treated as a trivial case: it
 	    merely shaves an additive constant off the required order of
 	    superpage allocations without changing underlying memory
@@ -199,8 +198,8 @@ operational benefits depending on this spectrum:
 	hierarchy.
 
     \item[\textbf{{Dense Spectra}\index{page size spectrum!dense} and
-	    Allocation Guarantees:}] Where {page clustering}
-		\index{page clustering} achieves a profound, qualitative
+	    Allocation Guarantees:}] Where
+		\pageclustering\ achieves a profound, qualitative
 		breakthrough is for smaller superpage\index{superpaging}
 		sizes. By maintaining physical allocations at the $Z$
 		boundary, Telix\index{Telix} can \textit{guarantee that
@@ -233,7 +232,7 @@ operational benefits depending on this spectrum:
 \label{sec:mem_coremapless}
 
 Sublinear physical memory management metadata is achieved in Telix
-\index{Telix} not through {page clustering}\index{page clustering}, but
+\index{Telix} not through \pageclustering, but
 through \textit{Pervasive Extent-Based Internal Accounting} and true
 \textit{Coremaplessness}.
 
