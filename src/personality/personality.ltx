@@ -6,7 +6,7 @@ To support foreign operating system Binaries (such as Linux ELF or
 Windows PE executables), Telix incorporates dynamic system call
 redirection tables \footcite{gerb01}. Foreign OS ABIs run atop
 user-level microkernel applications \footcite{golu91} backed by
-distributed Mach-style cluster messaging
+distributed \Mach-style cluster messaging
 \footcite{zajc93, rash87, milo93}.
 
 \section{Native Completion-Based System Call API}
@@ -15,14 +15,14 @@ To eliminate traditional trap-based system call overhead in the case of
 high-bandwidth system call issuance, Telix implements a memory-mapped
 submission and completion queue interface. This design builds upon the
 exception-less system call model introduced by FlexSC\footcite{soar10}
-and modern lock-free completion rings such as Linux \texttt{io\_uring}
+and modern lock-free completion rings such as Linux \iouring
 \footcite{axbo19}, where significant inspiration is also taken from
 \texttt{k42}\footcite{krie06}.
 \\
-Mach port -like facilities are also intended to be retained in parallel
+\Mach port -like facilities are also intended to be retained in parallel
 with the memory-mapped submission and completion interface for their
 potential to be made cluster-capable, network transparent and
-potentially stackable. (citation for Mach IPC architecture might be good)
+potentially stackable. (citation for \Mach IPC architecture might be good)
 
 \subsection{Memory-Mapped Submission and Completion Queues}
 % \subsection{\texttt{io\_uring}-alike Facility}

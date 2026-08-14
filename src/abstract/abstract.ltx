@@ -17,7 +17,7 @@ The Telix operating system is meant to serve as a modern operating system
 design for general-purpose use.
 \begin{enumerate}
 	\item{Formal verification for security à la
-		seL4\index{seL4}\footfullcite{klei09}}
+		\seLFour\footfullcite{klei09}}
 	\item{superpaging\index{superpaging}\footfullcite{nava02}}
 	\item{shared pagetables\footfullcite{ko03}}
 	\item{M:N threading\index{M:N threading} via {scheduler
@@ -30,19 +30,17 @@ design for general-purpose use.
 	\item{coscheduling\index{coscheduling}
 		\footfullcite{oust82, feit92}}
 	\item{EEVDF\index{EEVDF} scheduling\footfullcite{stoi95}}
-	\item{Barrelfish\index{Barrelfish}
-		multikernel\index{multikernel}\footfullcite{baum09}}
-		Systems are partitioned per the Barrelfish multikernel
-		scheme to subdivide them into smaller domains within
-		which scalability is more easily achievable.
-	\item{Asterinas\index{Asterinas}
-		framekernel\index{framekernel}\footfullcite{peng24}}
+	\item{\Barrelfish\ \multikernel\footfullcite{baum09}}
+		Systems are partitioned per the
+		\Barrelfish\ \multikernel\ scheme to subdivide them into
+		smaller domains within which scalability is more easily
+		achievable.
+	\item{\Asterinas\ \framekernel\footfullcite{peng24}}
 		Within a Barrelfish-style multikernel partition, shared
 		memory and shared address space domains are managed
-		using Asterinas' framekernel technique to provide a safe
-		TCB (Trusted Computing Base).
-	\item{microkernel-enabled\index{microkernel}
-		clustering\index{clustering}
+		using \Asterinas' \framekernel\ technique to provide a
+		safe \TCB\ (Trusted Computing Base).
+	\item{\microkernel-enabled \clustering
 		\footfullcite{zajc93, rash87, golu91, milo93}}
 	\item{completion-based system call interface
 		\footfullcite{krie06, ande91}}
@@ -54,8 +52,7 @@ design for general-purpose use.
 		Windows and others are intended.
 	\item{{page clustering}\index{page clustering}
 		\footfullcite{baba79, dick01}}
-	\item{effective use of inverted
-		pagetables\index{inverted pagetables} where available
+	\item{effective use of \invertedpagetables\ where available
 		\footfullcite{tall95, huck93}}
 	\item{sublinear memory metadata footprint esp. via having no
 		direct equivalents of page
