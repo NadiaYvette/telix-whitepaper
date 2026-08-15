@@ -373,18 +373,17 @@ Framekernel capability domains.
 
 \Asterinas's \framekernel
 \footcite{peng24} methodology shares a single kernel address space
-across the lowest-level domains it covers. Conversely, Barrelfish's
-\index{Barrelfish} multikernel\index{multikernel}\footcite{baum09}
-utilizes strictly separate kernel address spaces for the domains it
-manages.
+across the lowest-level domains it covers. Conversely, \Barrelfish's
+\multikernel\footcite{baum09} utilizes strictly separate kernel address
+spaces for the domains it manages.
 
-Telix leverages the multikernel\index{multikernel} approach to establish
+Telix leverages the \multikernel\ approach to establish
 ``soft partitions'' across the nodes of a Single System Image (SSI)
 \index{SSI (Single System Image)} cluster, geographically bounding
 domains within which scalability\index{scalability} remains physically
 and computationally feasible. Within these soft partitions, Telix
-subsequently adopts the framekernel\index{framekernel} strategy. This
+subsequently adopts the \framekernel\ strategy. This
 hybrid construction mitigates the overheads typically suffered by
 microkernels\index{microkernel}, specifically eliminating the expensive
 {address space}\index{address space} context switches required by
-traditional isolation-heavy IPC\index{IPC} mechanisms.
+traditional isolation-heavy \IPC\ mechanisms.
