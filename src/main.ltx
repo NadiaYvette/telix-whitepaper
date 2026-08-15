@@ -1,4 +1,4 @@
-% rubber: module xelatex
+% rubber: module lualatex
 % rubber: biblatex.path /home/nyc/src/bib/
 % rubber: watch main.bcf
 % rubber: onchange main.bcf 'biber main'
@@ -9,7 +9,9 @@
 % \usepackage{cs-techrep}[conference]
 \usepackage[utf8]{inputenc}
 \usepackage{csquotes}
-\usepackage[shorthands=off,french,german,turkish,main=english]{babel}
+\usepackage[shorthands=off,arabic,chinese-simplified,french,german,greek,hebrew,hindi,italian,latin,persian,portuguese,russian,spanish,turkish,bidi=basic,main=english,provide*=*]{babel}
+\babelfont[chinese,chinese-simplified,chinese-traditional]{rm}{FandolSong}
+\babelfont[*cyrillic,*greek,hebrew,russian]{rm}{NewComputerModern10}
 \usepackage{hyperref}
 \usepackage[backend=biber,style=authoryear,hyperref=true]{biblatex}
 \usepackage{makeidx}

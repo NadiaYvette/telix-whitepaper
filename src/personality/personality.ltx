@@ -52,8 +52,8 @@ Linux within embedded space and server space?
 WINE can basically be run as a server. This is probably to act as a
 drop-in replacement for the Western Linux desktop.
 
-\section{OpenHarmony Personality}
-While economic, OpenHarmony also has notable technology. The potential
+\section{\OpenHarmony\ Personality}
+While economic, \OpenHarmony\ also has notable technology. The potential
 for gain may be limited barring the ability to interoperate at a peer
 level. It's unclear whether the limitations would be mechanistic or
 policy-driven, where only the former would be tractable.
@@ -62,7 +62,7 @@ policy-driven, where only the former would be tractable.
 This might be an economic reach toward the Google ecosystem, though
 there are questions about how broadly Fuchsia, whose kernel Zircon is,
 is being deployed. There are similar questions about exclusion from
-interoperation via policy as OpenHarmony.
+interoperation via policy as \OpenHarmony.
 
 % =========================================================================
 % ADDITIVE SECTION: To be appended to src/personality/personality.ltx
@@ -124,7 +124,7 @@ Opaque Windows \texttt{HANDLE} references are mapped directly into Telix capabil
 \end{tabularx}
 \end{table}
 
-\subsection{Next-Gen Component ABIs: Zircon \& OpenHarmony}
+\subsection{Next-Gen Component ABIs: Zircon \& \OpenHarmony}
 \label{sec:nextgen_abis}
 
 In addition to legacy monolithic ABIs, Telix natively supports modern component-oriented architectures:
@@ -132,5 +132,5 @@ In addition to legacy monolithic ABIs, Telix natively supports modern component-
 \begin{description}
     \item[\textbf{Fuchsia / Zircon ABI}] \footcite{fuchsia_zircon}: Zircon relies on Object Handles and Channel Message passing (FIDL). Because Telix's native capability model is structurally isomorphic to Zircon handles, Zircon syscalls exhibit near 1:1 translation efficiency into native Telix capability channels.
 
-    \item[\textbf{OpenHarmony Subsystem}] \footcite{openharmony23}: OpenHarmony services communicate via Binder IPC. Telix emulates Binder interfaces using lock-free shared memory rings, allowing OpenHarmony components to run transparently across Telix multikernel partitions.
+    \item[\textbf{\OpenHarmony\ Subsystem}] \footcite{openharmony23}: \OpenHarmony\ services communicate via Binder IPC. Telix emulates Binder interfaces using lock-free shared memory rings, allowing \OpenHarmony\ components to run transparently across Telix multikernel partitions.
 \end{description}

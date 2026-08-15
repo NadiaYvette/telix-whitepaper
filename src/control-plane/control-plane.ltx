@@ -1,4 +1,5 @@
-\chapter{Control Plane Structure}
+\chapter{Control and Data Plane
+	\foreignlanguage{russian}{Матрëшка}/Matryoshka Structure}
 
 A cluster node is the largest unit of hierarchy: one machine's worth of
 sockets, cores, memory, and devices. That machine is partitioned along
@@ -83,18 +84,16 @@ model and enters through a FlexSC/\iouring-style completion interface.
 
 The control plane is complicated by adaptations to cover those 4
 domains, which are intended to coexist and nest something akin to
-matryoshka dolls. Complaints exist somewhere that concerns about
-hardware domain boundaries get mixed with protection/isolation
-boundaries. This is not in error: the author(s) are trying to place the
-protection/isolation boundaries so that they align with natural hardware
-boundaries.
+matryoshka dolls. Protection/isolation boundaries are deliberately
+placed so as to align hardware-affinity boundaries with
+protection/isolation boundaries. Telix is intended to place protection boundaries so they align with natural hardware boundaries.
 
-\section{Dual-Purpose Boundaries: Protection and Hardware Affinity}
+\section{Protection/Affinity Dual-Purpose Boundaries}
 
 Placing protection boundaries so they align with hardware affinity
 boundaries is an idea that's supposed to help somewhat with performance.
 
-\section{Between Matryoshka Nesting Layers: Duelling or Truelling IPC Models}
+\section{Per-\foreignlanguage{russian}{Матрëшка}/Matryoshka Layer IPC}
 
 Register-based trapping IPC (perhaps not synchronous like \Mach\ or
 \seLFour) is meant to coexist with the FlexSC/\iouring\ model, because
@@ -106,6 +105,30 @@ continuation-passing style for deferring work without proliferation of
 kernel data structures (there are likely some precedents for space
 conservation via interrupt model programming able to be cited
 somewhere — V?).
+
+\begin{table}[h]
+\centering
+\caption{IPC Scopes and Mechanisms}
+\label{tab:nt_object_mapping}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Nickname} & \textbf{Scope} & \textbf{Mechanism} \\
+\midrule
+\foreignlanguage{russian}{малышка} / malyshka / baby
+	& intra-partition control plane
+	& register IPC (not blocking-synchronous) \\
+\foreignlanguage{russian}{дочь} / doch / daughter
+	& intra-partition / intra-node data plane
+	& FlexSC/\texttt{io\_uring} shared-memory rings \\
+\foreignlanguage{russian}{мама} / mama / mum
+	& cross-NUMA-partition (same node)
+	& zero-copy shared-memory IPC \\
+\foreignlanguage{russian}{бабушка} / babushka / gran
+	& cross-cluster-node
+	& network message passing (async by nature, not a ring) \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \section{Within \multikernel\footcite{baum09} domain
 		\framekernel\footcite{peng24} TCB shared address space

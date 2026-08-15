@@ -3,7 +3,7 @@
 
 As computing environments shift from isolated monolithic hosts to hyper-connected Personal Area Networks (PANs), micro-edge clusters, and disaggregated NUMA topologies, operating systems must treat distribution as a first-class execution primitive.
 
-While platforms like OpenHarmony \footcite{openharmony23} and Fuchsia
+While platforms like \OpenHarmony\footcite{openharmony23} and Fuchsia
 \footcite{fuchsia_zircon} provide high-level distributed service buses
 over heavy user-space IPC, Telix unifies single-node
 \multikernel\ partitions and multi-device PAN topologies under a single
@@ -17,7 +17,7 @@ Telix scales seamlessly from sub-4~KiB memory-constrained sensor nodes running M
 \begin{description}
     \item[\textbf{Personal Area Networks (PANs):}] Low-power wireless nodes (BLE, Ultra-Wideband, IEEE 802.15.4) act as remote peripherals within a unified distributed capability domain. Memory-constrained PAN nodes export localized peripheral endpoints while offloading heavy async continuation processing to primary nodes.
 
-    \item[\textbf{Competitive Positioning vs. OpenHarmony / Fuchsia:}] OpenHarmony achieves multi-device integration by running full Android/Linux subsystems linked via RPC daemons. Fuchsia uses Zircon channels with explicit FIDL IPC interfaces. Telix eliminates the dual-runtime penalty by compiling uniform zero-copy Rust continuation channels locally, which dynamically wrap into lightweight networked packet frames when crossing physical transport boundaries.
+    \item[\textbf{Competitive Positioning vs. \OpenHarmony\ \& Fuchsia:}] \OpenHarmony\ achieves multi-device integration by running full Android/Linux subsystems linked via RPC daemons. Fuchsia uses Zircon channels with explicit FIDL IPC interfaces. Telix eliminates the dual-runtime penalty by compiling uniform zero-copy Rust continuation channels locally, which dynamically wrap into lightweight networked packet frames when crossing physical transport boundaries.
 \end{description}
 
 \section{Distributed Filesystem Access State}
