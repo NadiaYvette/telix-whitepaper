@@ -2,70 +2,434 @@
 \label{ch:verification}
 
 To guarantee microkernel-grade security alongside bare-metal performance,
-Telix employs a layered formal verification strategy. Rather than viewing the
-operating system in isolation, the verification architecture establishes a
-formal linkage between **hardware state dynamics** (ISA state transitions,
-page table walk invariants, relaxed memory semantics) and **kernel memory safety**
-(type preservation, encapsulation, and data-race freedom).
+Telix employs a layered formal verification strategy. The verification
+architecture establishes a formal linkage between
+\textbf{hardware state dynamics} (ISA state transitions,
+page table walk invariants, relaxed memory semantics) and
+\textbf{kernel memory safety} (type preservation, encapsulation, and
+data-race freedom).
 
-\section{Hardware State Modeling and Architectural Integrity}
+Unlike prior formally verified kernels (seL4, CertiKOS) which required
+thousands of person-years to verify a single implementation against a single
+ISA, Telix's verification architecture exploits three structural advantages:
+(1) the hardware model and its coherence theorems are already proven
+independently of any kernel implementation (the \textsc{Tessera} project,
+\S\ref{sec:hw_proofs}); (2) the framekernel's design choices reduce the
+kernel's state space to a bounded set of page-table and TLB-shootdown
+protocols; (3) a unifying proof framework—Iris separation logic—spans both
+the hardware model and the kernel code, enabling direct composition.
 
-The kernel's primary operational role is to drive state transitions in underlying
-hardware peripherals, MMU translation tables, and CPU register files without
-corrupting state invariants. Model choices depend on target ISA semantics and memory architectures:
+\section{The Unified Verification Stack}
+\label{sec:unified_stack}
+
+Telix's verification architecture composes four independently developed,
+formally connected layers:
+
+\begin{enumerate}
+  \item \textbf{ISA Semantics (Sail \& upstream proofs).}
+    RISC-V and ARMv8 instruction semantics are specified in the Sail
+    language \footcite{armstrong19} and mechanically translated to Rocq
+    (formerly Coq). The upstream sail-riscv and sail-arm models carry
+    independent verification by the REMS project. Telix's hardware
+    model connects to these via conformance bridge lemmas
+    (\S\ref{sec:hw_proofs}).
+
+  \item \textbf{Hardware Model (Tessera).}
+    A multi-architecture machine model—the MMU, TLBs, page tables,
+    IOMMU, interrupt controller, timer, and device topology—is specified
+    in Sail, mechanically generated to Rocq, and proven correct with
+    \textasciitilde{}12,000 lines of machine-checked proofs
+    (\S\ref{sec:hw_proofs}).
+
+  \item \textbf{Machine Interface Iris Layer.}
+    The hardware model's invariants—PTE ownership, TLB coherence,
+    IOMMU mapping integrity—are lifted into Iris separation-logic
+    resources (\S\ref{sec:machine_interface}). These resources
+    constitute the bridge between the hardware proofs and any kernel
+    implementation.
+
+  \item \textbf{Kernel Verification (RefinedRust).}
+    The framekernel's page-table manipulation, TLB shootdown, and IPI
+    protocol paths are translated from Rust MIR to Rocq and proven to
+    satisfy the machine interface specs using RefinedRust
+    \footcite{gaher24refinedrust} (\S\ref{sec:kernel_verification}).
+\end{enumerate}
+
+\begin{figure}[h]
+\centering
+{\small
+\begin{verbatim}
+   Sail ISA specs ──► Rocq Machine model (Tessera, ~12K lines proven)
+       (upstream)            │
+                             │ provides Iris specs
+                             ▼
+                     Machine Interface Iris Layer
+                     (pte_token, tlb_flushed, iommu_mapping)
+                             │
+       ┌─────────────────────┼─────────────────────────┐
+       │                     │                         │
+       ▼                     ▼                         ▼
+   Sv39 proofs        Weak-memory lift          IOMMU coherence
+   (coherence.v)    (gpfsl/iRC11)             (iommu_proofs.v)
+                                                   │
+       Kernel code ◄── RefinedRust ◄──┘────────────┘
+         (Rust)       (MIR→Coq)       hardware guarantees
+\end{verbatim}
+}
+\caption{The unified verification stack: four layers, one proof assistant
+         (Rocq), one separation logic (Iris).}
+\label{fig:verification_stack}
+\end{figure}
+
+\section{Hardware-Integrity Proofs (Tessera)}
+\label{sec:hw_proofs}
+
+The \textsc{Tessera} project provides the hardware-side formal guarantees
+on which Telix's kernel proofs rest. All theorems are machine-checked in
+Rocq and closed under the global context (axiom-free).\footnote{\fullcite{tessera25}}
+
+\subsection{Page-Table Coherence (G1--G2)}
+
+The central invariant linking kernel operations to hardware state:
+
+\[
+\forall\ \text{core} \in \text{Machine.cores},\ 
+\forall\ \text{entry} \in \text{core.tlb},\ 
+\exists\ \text{pte} \in \text{Machine.mem}\ \text{such that}\ 
+\text{entry.ppn} = \text{pte.ppn} \land \text{entry.perm} \subseteq \text{pte.perm}
+\]
+
+\textsc{Tessera} proves:
+\begin{itemize}
+  \item \textbf{Root-entry removal} (Stage 1): dropping a level-2 PTE
+        faults the walk at level 2, before any address arithmetic is forced.
+  \item \textbf{Leaf-entry removal} (Stage 1.1): the same guarantee for
+        level-0 PTEs—invalidation at any level of the radix tree prevents
+        translation.
+  \item \textbf{Upstream conformance} (G1): the hand-transcribed oracle
+        walk is proved equivalent to the upstream sail-riscv \texttt{pt\_walk}
+        via a bitfield extraction bridge lemma.
+  \item \textbf{Multi-architecture conformance}: the same coherence theorems
+        are replayed for MIPS PageGrain (1~KiB pages), LoongArch (odd/even
+        page-pair MMU), and AArch64 (block+contpte+LPA2) via generic
+        shootdown modules.
+\end{itemize}
+
+\subsection{TLB Shootdown Under Weak Memory (G3--G4)}
+\label{sec:shootdown_proofs}
+
+The shootdown protocol—invalidate PTE, local flush, IPI broadcast, wait
+for remote acknowledgements—is proven correct under genuine weak-memory
+semantics:
 
 \begin{description}
-    \item[\textbf{Sail Specification Language}] \footcite{armstrong19}:
-    Acts as the foundational ISA semantic model for RISC-V and ARMv8. Sail models
-    provide executable instruction specifications and automatically synthesize
-    machine-checked definitions for theorem provers (Coq/Isabelle) and SMT solvers.
+  \item[\textbf{Sequential consistency (S2.0).}] The functional shootdown
+        theorem: if every core flushes its TLB after PTE invalidation, no
+        core can translate the VA. Proved for Sv39, MIPS, LoongArch, and
+        AArch64.
 
-    \item[\textbf{Katamaran}] \footcite{katamaran23}:
-    A semi-automatic separation logic verifier built directly on Sail. Katamaran
-    is ideal if Telix leverages capability-based hardware models (e.g., CHERI/Morello),
-    as it verifies universal contracts directly against hardware specification state transitions.
+  \item[\textbf{N-core weak memory (S2.2).}] The broadcast protocol
+        is lifted to the gpfsl/iRC11 release-acquire model
+        \footcite{kaiser18irc11} over the concrete generated
+        \texttt{machine.v}. The release/acquire fences in the IPI
+        mechanism are proved sufficient for coherence without requiring
+        sequential consistency.
 
-    \item[\textbf{VRM (Verification on Relaxed Memory)}] \footcite{sosp21vrm}:
-    A specialized framework for verifying multiprocessor OS kernel code managing shared
-    page tables under relaxed memory architectures (such as ARM or RISC-V weakly-ordered memory models).
-    VRM enables verifying concurrent page table updates under sequential consistency assumptions,
-    automatically lifting the proofs to relaxed hardware operational models (\texttt{rmem}) \footcite{pulte18rmem}.
+  \item[\textbf{IPI delivery model (S2.3--S2.5).}] The interrupt
+        controller (INTC) is modelled as a ghost step in the gpfsl
+        program: the leader's ghost step on remote ack~$i$ corresponds
+        exactly to \texttt{receive\_ipi (deliver\_ipi \_ i)}. The
+        interrupt priority/masking discipline and drain behaviour are
+        proved not to break the broadcast invariant.
 \end{description}
 
-\section{Kernel Memory Access and Race-Freedom Verification}
+\subsection{IOMMU Integrity (G5)}
 
-At the language layer, Telix relies on Rust's strong static type system for safe code.
-However, kernel boot sequences, MMU configuration, and atomic lockfree synchronization
-require \texttt{unsafe} abstractions. We evaluate three primary verification frameworks for these boundaries:
+The IOMMU's translation cache (IOTLB) must stay coherent with the CPU
+page table. \textsc{Tessera} proves the invariant $\text{IOTLB}
+\subseteq \text{mapping}$ across three IOMMU architectures:
+
+\begin{itemize}
+  \item \textbf{VT-d} (Intel): root-table, context-entry, PASID-table,
+        and IOTLB coherence, including ATS/PRI device-TLB shootdown under
+        weak memory.
+  \item \textbf{SMMUv3} (Arm): Stream Table Entry (STE), Context
+        Descriptor (CD), two-stage translation, and TLBI granularity.
+  \item \textbf{AMD-Vi}: Device Table Entry (DTE), PASID cache, and
+        IOTLB invalidation replay.
+\end{itemize}
+
+\subsection{Device Models \& Topology}
+
+Beyond the MMU and IOMMU, \textsc{Tessera} models the interrupt controller
+(GIC/AIA), timer device (SSTC), UART, network interface, and disc DMA
+controller as Sail specifications with Rocq test vectors. The topology
+model (SSG-1/9) captures SMT harts, NUMA nodes, and multikernel domain
+boundaries for page-sharing and shootdown-scoping proofs.
+
+\section{Machine Interface Iris Layer}
+\label{sec:machine_interface}
+
+The critical bridge between the hardware proofs and any kernel
+implementation is the \textbf{machine interface Iris layer}—a set of
+Iris separation-logic resources that encode hardware invariants as
+proof-carrying tokens:
+
+\begin{quote}
+\begin{verbatim}
+(* "I own this PTE and it maps va → pa with permissions perm" *)
+Definition pte_token (va : vaddr) (pa : paddr) (perm : Perm)
+  : iProp Σ := ...
+
+(* "I flushed this TLB entry; no core can translate va" *)
+Definition tlb_flushed (va : vaddr) : iProp Σ := ...
+
+(* "The IOMMU domain d translates va → pa" *)
+Definition iommu_mapping (d : Domain) (va : vaddr) (pa : paddr)
+  : iProp Σ := ...
+
+(* "This PTE subtree is shared across N address spaces" *)
+Definition shared_subtree (root_ppn : paddr) (n : nat)
+  : iProp Σ := ...
+\end{verbatim}
+\end{quote}
+
+Each resource is \textbf{proved sound} against the generated machine
+model. For example:
+
+\begin{quote}
+\begin{verbatim}
+Lemma wp_sfence_vma (va : vaddr) :
+  {{{ pte_token va pa perm ∗ ... }}}
+    sfence_vma va
+  {{{ RET (); tlb_flushed va }}}.
+
+Lemma unmap_protocol_preserves_coherence (va : vaddr) :
+  pte_token va pa perm ∗ tlb_entry va ⊢
+  |==> tlb_flushed va ∗ ¬pte_token va pa perm.
+\end{verbatim}
+\end{quote}
+
+The \texttt{unmap\_protocol\_preserves\_coherence} lemma is \textbf{not}
+a kernel-specific proof. It composes the hardware theorems
+(\texttt{bc\_broadcast\_spec}, \texttt{coherence\_leaf},
+\texttt{iommu\_shootdown\_correct}) into a protocol-level guarantee:
+\textit{any} code that acquires \texttt{pte\_token} and follows the
+four-step protocol (invalidate → local flush → IPI → wait) is entitled to
+\texttt{tlb\_flushed}. The kernel's job is to follow the protocol.
+
+\section{Kernel Verification via RefinedRust}
+\label{sec:kernel_verification}
+
+\subsection{Toolchain Selection}
+
+The Rust formal verification landscape has matured substantially since
+the original RustBelt soundness proof \footcite{jung18rustbelt}. The
+following tools are evaluated for the Telix framekernel:
 
 \begin{table}[h]
 \centering
 \begin{threeparttable}
-\caption{Comparative Analysis of Formal Verification Toolchains}
+\caption{Comparative Analysis of Rust Verification Toolchains (2024--2025)}
 \label{tab:verification_comparison}
 \begin{tabularx}{\textwidth}{l X X X}
 \toprule
-\textbf{Toolchain} & \textbf{Primary Domain} & \textbf{Strengths} & \textbf{Dependencies / Trade-offs} \\
+\textbf{Toolchain} & \textbf{Approach} & \textbf{Strengths} & \textbf{Trade-offs} \\
 \midrule
-\textbf{Iris Framework}\footnotemark & Higher-Order Concurrent Separation Logic & Expressive higher-order invariants; foundational theorem prover support in Coq. & High manual proof effort; steep learning curve. \\
+\textbf{RefinedRust}\footnotemark
+  & Translates Rust MIR $\to$ Coq; proves functional correctness in Iris.
+  & Same separation logic as Tessera hardware proofs; handles
+    \texttt{unsafe} blocks; semi-automated.
+  & Requires Iris expertise; not yet tested on bare-metal kernel code. \\
 \midrule
-\textbf{RustBelt}\footnotemark & Semantic Soundness of Rust & Formalized proof framework built on Iris to verify \texttt{unsafe} standard library blocks. & Geared towards standard library abstractions; requires formal mapping for custom kernel primitives. \\
+\textbf{Aeneas}\footnotemark
+  & Translates Rust $\to$ Coq (pure functional); suited for crate-level
+    verification.
+  & Handles borrowing, lifetimes, traits; good for library/data-structure
+    proofs.
+  & Pure-functional target; less suited for imperative MMU-manipulation
+    code with side effects. \\
 \midrule
-\textbf{RefinedC / Islaris}\footnotemark & Automated Verification of C / Binary Code & High degree of proof automation via SMT; links binary execution directly to Sail semantics. & Primarily targeted at low-level procedural C and binary stubs rather than idiomatic Rust. \\
+\textbf{Verus}\footnotemark
+  & SMT-based (Z3); annotation-driven; no Coq connection.
+  & Most ergonomic; lowest proof burden for developers.
+  & No Iris support; cannot compose with Tessera hardware proofs;
+    no weak-memory reasoning. \\
 \bottomrule
 \end{tabularx}
 \begin{tablenotes}
-	\small
-	\item[5]{\fullcite{jung15iris}}
-	\item[6]{\fullcite{jung18rustbelt}}
-	\item[7]{\fullcite{sammler21}}
+  \small
+  \item[1]{\fullcite{gaher24refinedrust}}
+  \item[2]{\fullcite{ho22aeneas}}
+  \item[3]{Lattuada, A., et al. ``Verus: Verifying Rust Programs using
+           Linear Ghost Types.'' \emph{Proc. ACM Program. Lang.} 7,
+           OOPSLA1 (2023). \texttt{doi:10.1145/3586037}.}
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-\subsection{Verification Strategy Selection Matrix}
+\textbf{RefinedRust is the natural fit} because it embeds into Iris—the
+same separation logic that \textsc{Tessera}'s hardware proofs use. This
+means:
 
 \begin{itemize}
-    \item \textbf{Option A (Pure Iris / RustBelt Integration):} Best fit if the Framekernel minimizes C/assembly stubs and exposes driver interfaces purely as safe Rust primitives validated via RustBelt semantics.
-    \item \textbf{Option B (Sail + Katamaran + VRM):} Best fit if the multikernel partition layer relies heavily on explicit hardware memory barriers, shared page table manipulation across CPU cores, or capability extensions.
+  \item The machine interface layer (\S\ref{sec:machine_interface}) can be
+        directly imported as Iris resources into RefinedRust's Coq model
+        of the kernel.
+  \item A kernel function like \texttt{unmap\_range()} gets an Iris spec:
+        $\{\ \texttt{pte\_token}(va, pa, perm) *
+           \texttt{tlb\_entry}(va)\ \}\
+           \texttt{unmap\_range}(va)\
+           \{\ \texttt{tlb\_flushed}(va) *
+           \neg\texttt{pte\_token}(va, pa, perm)\ \}$.
+  \item The hardware's \texttt{bc\_broadcast\_spec} theorem guarantees
+        that following the protocol achieves
+        $\texttt{tlb\_flushed}(va)$. RefinedRust proves the kernel follows
+        the protocol. The two proofs compose.
 \end{itemize}
+
+\subsection{Scope and Limitations}
+
+Kernel Rust differs from application Rust: no \texttt{std} library, raw
+MMIO, inline assembly (\texttt{sfence.vma}, \texttt{mret}), a custom
+allocator (LLFree \footcite{litz2021llfree}), and interrupt-driven
+state machines. Adapting RefinedRust (or Aeneas) to this environment
+requires defining the machine interface Iris layer
+(\S\ref{sec:machine_interface})—a well-scoped engineering effort rather
+than an open research problem. The target scope is the
+\textbf{framekernel core} only: page-table traversal and modification,
+TLB shootdown protocol, IPI send/receive, and IOTLB invalidation
+(\textasciitilde{}3,000--5,000 lines of Rust). The external pagers,
+personality servers, filesystem, and scheduler are verified separately
+or treated as untrusted.
+
+\subsection{How the Whitepaper Design Reduces Verification Surface}
+
+Each design choice in Chapters~\ref{ch:memory} and~\ref{ch:control-plane} simplifies the
+verification task:
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Design Choice} & \textbf{Verification Benefit} \\
+\midrule
+External pagers (VM in userspace)
+  & Each pager is a separate process; its proof is independent and
+    bounded. A fault in one pager cannot corrupt the framekernel. \\
+\midrule
+Coremapless (no global \texttt{mem\_map[]})
+  & No global invariant over all frames; per-frame ownership via
+    LLFree tokens. Page ownership is local, not global. \\
+\midrule
+Continuation-passing style (CPS)
+  & Rust \texttt{Future} continuations have explicit, finite state
+    sets—easier to specify than arbitrary stackful code. Known Iris
+    models exist from the RustBelt project. \\
+\midrule
+Personality servers (Linux/Windows/Zircon)
+  & Foreign ABIs are untrusted. Correctness depends only on capability
+    channel protocols, not on the internal logic of any server. \\
+\midrule
+Framekernel shared address space
+  & No address-space switch during IPC. TLB coherence is the
+    \emph{only} cross-domain concern requiring proof. \\
+\bottomrule
+\end{tabularx}
+\caption{How whitepaper design choices reduce the verification surface area.}
+\label{tab:design_verification}
+\end{table}
+
+\subsection{Incremental Verification Strategy}
+
+Unlike a monolithic kernel that must be verified in one
+all-or-nothing pass, Telix's architecture supports incremental
+verification:
+
+\begin{enumerate}
+  \item \textbf{Phase 1---Protocol contracts.} Extract the FSM
+        description of each kernel operation's interaction with the
+        machine: PTE invalidate, local flush, IPI broadcast, wait for
+        acks. Prove that executing the protocol restores coherence
+        (composing hardware theorems). These proofs are reusable by any
+        kernel implementation.
+
+  \item \textbf{Phase 2---PMC instrumentation.} Insert lightweight
+        trace assertions into the existing prototype that log protocol
+        state transitions at runtime. A single test run exercises all
+        kernel operations and provides a witness that the protocol was
+        followed.
+
+  \item \textbf{Phase 3---Machine interface Iris layer.} Define the
+        Iris resources (\S\ref{sec:machine_interface}) and prove they are
+        sound against the generated machine model.
+
+  \item \textbf{Phase 4---RefinedRust integration.} Apply RefinedRust
+        to the framekernel core's protocol-relevant paths. Prove the
+        Rust code satisfies the machine interface specs.
+
+  \item \textbf{Phase 5---External pager proofs.} Each pager (COW,
+        ZFOD, page cache, KAU manager) gets its own, independent
+        RefinedRust proof. The pager's spec is ``if the kernel gives me
+        \texttt{pte\_token}, I will manage COW/faults correctly.''
+\end{enumerate}
+
+\section{Cross-Prover Refinement}
+
+The \textsc{Tessera} hardware proofs are in Rocq; Telix's algorithmic
+proofs about KAU integrity, refcount discipline, and allocation
+correctness (the ``Layer-A'' proofs) are in Lean. These are not required
+to run in the same prover. The bridge is a joint invariant:
+
+\begin{quote}
+\emph{A KAU (allocation unit of size $Z$) can only be freed after the
+shootdown protocol has completed for every mapping fragment $K$
+within it.}
+\end{quote}
+
+This is a paper proof that does not require running both provers
+simultaneously. It connects the Lean-side guarantee (``if you follow
+allocation discipline, refcounts are sound'') with the Rocq-side
+guarantee (``if you follow the shootdown protocol, TLBs are coherent'').
+
+\section{Weak-Memory Model Soundness}
+
+The weakest link in any kernel verification is the memory model.
+\textsc{Tessera}'s shootdown and IOMMU proofs use the
+\textbf{gpfsl/iRC11} release-acquire model \footcite{kaiser18irc11}
+rather than assuming sequential consistency. This is critical because
+Telix targets AArch64 and RISC-V, both of which have weakly-ordered
+memory, and the framekernel relies on release/acquire fences (not
+heavyweight \texttt{dsb}/\texttt{fence} barriers) for IPI
+synchronisation.
+
+The iRC11 model is an operational semantics with a race detector for
+non-atomics, proven sound against the RC11 axiomatic model in prior
+work. Telix does not re-prove this soundness; it inherits it from the
+gpfsl library.
+
+\section{Toolchain Availability}
+
+All software in the verification stack is open-source and actively
+maintained as of 2025--2026:
+
+\begin{itemize}
+  \item \textbf{Rocq} (formerly Coq) 9.2+ with the rocq-9.2 opam switch.
+  \item \textbf{Iris} 4.5.0 (heap\_lang + proofmode), with gpfsl
+        vendored into \textsc{Tessera}'s \texttt{third\_party/}.
+  \item \textbf{Sail} 0.20+ (sail\_coq\_backend) for ISA model generation.
+  \item \textbf{RefinedRust} (PLDI 2024), available via opam.
+  \item \textbf{gpfsl} (iRC11), development version compatible with
+        Rocq 9.2.0.
+
+  \item \textbf{Lean 4} (for Layer-A KAU/refcount proofs; separate opam
+        switch).
+\end{itemize}
+
+\textsc{Tessera}'s build is a single script
+(\texttt{hardware/rocq/build.sh}) that compiles every module
+(\textasciitilde{}12,000 lines of Rocq) in \textasciitilde{}8 minutes
+on a modern laptop, with automatic axiom-hygiene checking. The full
+hardware-trust line—upstream Sail models $\to$ generated Rocq $\to$ pure
+proofs $\to$ gpfsl weak-memory proofs $\to$ multi-arch replay—is in one
+opam switch, one proof assistant, one build command.
