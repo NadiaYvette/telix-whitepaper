@@ -515,14 +515,27 @@ Every general-purpose operating system in wide use assumes a radix-tree
 page table and a small, fixed page-size spectrum (typically a 4~KiB
 base page plus one or two huge-page sizes, e.g. 2~MiB/1~GiB on x86).
 Their allocators, page-table walkers, TLB shootdown paths, and
-reverse-mapping structures are all specialised to that assumption.
-None of them could drive a 42-size inverted page table with a
-software-managed refill and a residue-partitioned TLB in anything
-remotely resembling its current form: the dense spectrum and inverted
-structure are usable only because Telix's morsel allocator,
-extent-based accounting, and verified refill handler are designed for
-them from the start.  This is the strongest expression of the claim
-that page clustering is not an incremental change to existing memory
+reverse-mapping structures are all specialised to that assumption, and
+the 256~B base page defeats them from two directions at once.
+
+First, almost every kernel allocates a per-page descriptor array sized
+to the number of hardware pages.  At 256~B the overhead is $16\times$
+that at 4~KiB for the same physical RAM, so the metadata would rival or
+exceed the memory it tracks.  Second, the few kernels that might
+dress the inverted table up as a legacy radix-tree MMU to reuse
+existing walker and shootdown logic hit the same wall: a 256~B base
+page over a 64-bit VA would require a radix tree of roughly sixteen
+levels, whose page-table overhead dwarfs the mapped memory.  The dense
+42-size spectrum cannot be flattened onto a fixed multi-level walk
+without abandoning both the fine granularity and the inverted table's
+size-proportional-to-mappings property.
+
+This MMU is therefore drivable only by a kernel whose memory
+management is built around extents and an inverted structure from the
+start — which is precisely what Telix provides, through its morsel
+allocator, extent-based accounting, and software-managed refill with a
+verified handler.  That is the strongest expression of the claim that
+page clustering is not an incremental change to existing memory
 management but a different point in the design space.
 
 The extension is modelled in Sail and mechanically generated to Rocq,
