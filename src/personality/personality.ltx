@@ -93,6 +93,13 @@ When an unmodified foreign binary executes a hardware system call trap (e.g., x8
 
 The Linux personality server provides POSIX compatibility by wrapping monolithic Linux abstractions around Telix capabilities \footcite{daSilva20wsl}:
 
+Memory-management system calls (\texttt{mmap}, COW faults, \texttt{fork})
+are not implemented inside the personality server.  They are translated
+into external-pager requests to the designated pager server
+(\S\ref{sec:fs_vm_decoupling}), so the Linux personality inherits the
+same zero-copy page-caching and distributed-paging model as native
+processes.
+
 \begin{itemize}
     \item \textbf{File Descriptor Table Mapping:} Linux integer file descriptors (`0, 1, 2, ...`) are maintained in a thread-local, lock-free array that translates indices directly into native Telix Capability Tokens.
     \item \textbf{Asynchronous Event Unification:} Linux \texttt{epoll} and \texttt{io\_uring} calls are natively mapped 1:1 to Telix asynchronous continuation polling loops (as detailed in Section~\ref{sec:mn_threading}), eliminating impedance mismatch between Linux event loops and Telix execution state.

@@ -111,22 +111,23 @@ matryoshka domains, where protection/isolation boundaries are
 deliberately aligned with hardware-affinity boundaries.
 
 \section{Protection/Affinity Dual-Purpose Boundaries}
+\label{sec:protection_affinity}
 
-Placing protection boundaries so they align with hardware affinity
-boundaries is an idea that's supposed to help somewhat with performance.
+Protection boundaries are placed so that they coincide with hardware
+affinity boundaries.  A partition boundary between two NUMA nodes is
+simultaneously an isolation boundary and the natural edge of a
+coherence and message-passing domain, so the cost of enforcing
+isolation (address-space switches, TLB shootdowns, message
+serialisation) is paid exactly where the hardware imposes a
+communications cost anyway.
 
-\section{Per-\foreignlanguage{russian}{Матрëшка}/Matryoshka Layer IPC}
-
-Register-based trapping IPC (perhaps not synchronous like \Mach\ or
-\seLFour) is meant to coexist with the FlexSC/\iouring\ model, because
-the memory mapping is fundamentally incompatible with transmission over
-the wire (or airwaves) for clustering. This might even be a truel (3-way
-duel) because some element of IPC within the framekernel domains might
-be said to be occurring via the interrupt model programming and
-continuation-passing style for deferring work without proliferation of
-kernel data structures (there are likely some precedents for space
-conservation via interrupt model programming able to be cited
-somewhere — V?).
+\section{Per-\foreignlanguage{russian}{Матрëшка}/Matryoshka Layer IPC}Register-based trapping IPC (not blocking-synchronous like \Mach\ or
+\seLFour) coexists with the FlexSC/\iouring\ model because the two
+mechanisms serve different scopes: a shared-memory ring cannot survive
+transmission over the wire (or airwaves) to a remote cluster node, so
+the ring is used where memory is shared and register IPC where it is
+not.  The four scopes and their mechanisms are summarised in
+Table~\ref{tab:ipc_scopes}.
 
 \begin{table}[h]
 \centering
@@ -152,54 +153,44 @@ somewhere — V?).
 \end{tabularx}
 \end{table}
 
-\section{Within \multikernel\footcite{baum09} domain
-		\framekernel\footcite{peng24} TCB shared address space
-		direct continuation call}
-% \section{Within Framekernel Domains: Continuations and State Machines}
+\section{Within a Framekernel Domain: Continuation Calls}
+\label{sec:within_framekernel}
 
-Rust appears to have a way to support continuation-passing style.
 Within a framekernel domain, state machines and continuations are the
-fundamental control flow dispatch mechanism. In effect, within the
-framekernel domain, the interrupt model of programming is used in lieu
-of the task model of programming.
+fundamental control-flow dispatch mechanism: the interrupt model of
+programming is used in lieu of the task model.  Rust's \texttt{async}
+desugars this continuation-passing style into ordinary-looking
+\texttt{await} code, so the burden of manually managing continuation
+state is carried by the compiler rather than the programmer.
+Microkernel minimality bounds the amount of code written in this
+interrupt style, which matters because the style, while compact, is
+more burdensome to write by hand than the task model.
 
-Microkernel minimality limits the scope of applicability here, which may
-be for the best, because manually managing continuation state is
-burdensome.
-
-\section{Kernel-user FlexSC-like\index{FlexSC}\footcite{soar10}
-		mapped ring}
-% \section{Within Multikernel Domains: Network Protocol Like Message Passing}
-
-% Between the \multikernel's partitions or subdomains,
-% \microkernel-style message passing is handled in an explicitly network
-% protocol handling-oriented fashion.
+\section{Kernel--User Boundary: FlexSC-Like Mapped Rings}
+\label{sec:kernel_user_ring}
+\index{FlexSC}\footcite{soar10}
 
 Most things dealt with by conventional monolithic kernels via function
-calls are instead done via ``userspace'' processes, which then involve
-the syscall API/ABI. The scare quotes are because these typically
-involve highly elevated privileges in order to manipulate pagetables
-\index{pagetable} and execute privileged instructions to do things like
-fill the TLB\index{TLB}. For instance, ``external pagers'' are
+calls are instead done by ``userspace'' processes, which then use the
+syscall API/ABI.  The scare quotes reflect that these processes are
+highly privileged: they manipulate page tables \index{pagetable} and
+execute privileged instructions (for instance, filling the
+TLB\index{TLB}).  ``External pagers'' are the canonical example ---
 ``userspace'' processes that act in the place of an in-kernel virtual
 memory API.
 
-\section{Between \multikernel\ domain zero copy network-like IPC}
-% \section{Within Cluster Nodes: Zero Copy IPC}
+\section{Between Multikernel Domains: Zero-Copy IPC}
+\label{sec:between_multikernel}
 
-		Given that these are meant to align with NUMA
-		\index{NUMA} nodes or small, topologically nearby groups
-		thereof, a ``remote'' access penalty might be taken, but
-		of vastly smaller magnitude than for remote cluster
-		\index{cluster} nodes.
+Because multikernel domains align with NUMA\index{NUMA} nodes (or small,
+topologically nearby groups of them), a ``remote'' access penalty is
+paid when crossing a domain boundary, but it is of vastly smaller
+magnitude than the penalty for a remote cluster\index{cluster} node.
 
-\section{Between Cluster\index{clustering} Nodes: Network-Transparent IPC}
+\section{Between Cluster Nodes: Network-Transparent IPC}
+\label{sec:between_cluster_nodes}
 
-		While it's possible to take advantage of shared memory
-		that's otherwise largely been partitioned to, say, do
-		zero copy data transfer between
-		\multikernel\ domains typically aligned with
-		\NUMA\ nodes, \cluster\ nodes
-		are another matter entirely and there's no way to avoid
-		having to do much slower sorts of IO operations to
-		transmit the data between the nodes.
+While shared memory can be exploited for zero-copy transfer between
+\multikernel\ domains (typically aligned with \NUMA\ nodes),
+\cluster\ nodes are another matter entirely: there is no way to avoid
+much slower I/O operations to transmit data between them.
