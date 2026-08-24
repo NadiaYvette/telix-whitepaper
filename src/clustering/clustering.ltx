@@ -61,8 +61,8 @@ Conventional operating systems struggle with process migration because raw virtu
     % Continuation-based Telix migration
     \node [draw, rectangle, fill=green!10, text width=4.5cm, align=center, right=1.0cm of trad] (telix) {
         \textbf{Telix Continuation Migration}\\
-        \small Transfers Anonymous Async State Machine Struct \& Capability Handle\\
-        \textbf{Cost: $O(1)$ (Bytes/Kilobytes)}
+        \small Transfers Named, Serializable State Machine Struct \& Capability Handle\\
+        \textbf{Cost: $O(\textrm{state size})$ (Bytes/Kilobytes, not RAM/proportional)}
     };
 \end{tikzpicture}
 \caption{Comparison of traditional full-stack process migration versus Telix stackless continuation serialization.}
@@ -70,12 +70,38 @@ Conventional operating systems struggle with process migration because raw virtu
 \end{figure}
 
 \subsection{Stackless Serialization Mechanics}
-Because Telix constructs concurrent kernel tasks using stackless Rust \texttt{Future} continuations, an in-flight operation is represented in memory as an anonymous compiler-generated state machine enum.
 
-To migrate an executing task across nodes:
+Because Telix constructs concurrent kernel tasks using stackless Rust
+\texttt{Future} continuations, an in-flight operation is represented in
+memory as a compiler-generated state machine enum.  Individual
+continuations that are candidates for migration \emph{must} use an
+explicit, named, serializable state type (Option~A: write the enum by
+hand and \texttt{\#{[}derive(Serialize){]}} it; Option~B: a proc-macro
+that expands \texttt{async fn} into a named, serde-derivable state
+machine, a listed future deliverable).  Rust's \texttt{async}/
+\texttt{await} sugar generates an anonymous, unnameable state
+machine, and Rust has no reflection over arbitrary types, so an
+arbitrary \texttt{Future} cannot be generically serialised.
+
+The serialised size is the size of the future's captured state —
+bounded and typically small, but not constant — rather than being
+proportional to RAM or kernel-stack size as in traditional full-stack
+migration \footcite{clark05migration}.
+
+To migrate a continuation across nodes:
 \begin{enumerate}
     \item The origin node pauses polling on the task's root \texttt{Future}.
-    \item The state machine structure (containing only active variable fields rather than unallocated stack frame space) is serialized.
-    \item Associated memory handles are reassigned as remote hardware capability tokens.
-    \item The target node resumes execution simply by calling \texttt{Future::poll()} on its local event loop.
+    \item The named, serializable state machine structure (containing
+    only active variable fields rather than unallocated stack frame
+    space) is serialized.
+    \item Associated memory handles are reassigned as remote hardware
+    capability tokens.
+    \item The target node deserializes the state and resumes execution
+    by calling \texttt{Future::poll()} on its local event loop.
 \end{enumerate}
+
+Migration is a tool for implementing distributed-device sharing, not
+a headline feature in its own right.  The clustering story's headline
+is parity with OpenHarmony and other IoT/PAN-capable systems via
+distributed device access and data sharing, which does not depend on
+continuation migration.

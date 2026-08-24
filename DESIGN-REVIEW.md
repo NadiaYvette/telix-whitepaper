@@ -458,9 +458,41 @@ arbitrary `Future`'s internal state. The clustering chapter asserts
 (serde derive? a custom runtime? compiler support?). Until the mechanism
 exists, `O(1)` migration is aspirational.
 
-**What would answer it.** Name the serialization mechanism and its
-limitations (e.g., which futures are migratable), or soften the migration
-claim to "bounded state, migratable futures only."
+**Status: resolved (2026-08-24).** The author makes four decisions:
+
+1. **What migrates.** Reifying procedures as state machines enables
+   marshalling/serialisation of their state.  This technique applies
+   broadly (not only to sockets) and, while it does not solve all of
+   process migration, it is a useful tool for implementing it.
+   Process migration is not a headline feature; the clustering
+   headline is parity with OpenHarmony and other IoT/PAN-capable
+   systems via distributed device access and data sharing.
+
+2. **Mechanism: Option A (manual state machines) now, Option B
+   (proc-macro) as a future deliverable.**  Option A — write the
+   state-machine enum explicitly, `#[derive(Serialize)]` it,
+   implement `Future` by hand — is standard Rust and works today.
+   Option B — a derive macro that expands `async fn` into a named,
+   serde-derivable state machine — is a listed deliverable.
+   Self-referential state is the hard case for Option B, but the
+   author judges it unlikely to arise in practice for the migration
+   use case.
+
+3. **The `O(1)` claim corrected to `O(state size)`.** The serialised
+   size is the size of the captured variables, which is bounded and
+   typically small but not constant.  The meaningful comparison is
+   against traditional full-stack migration (proportional to RAM and
+   page-table size), not against the degenerate empty case.
+
+4. **Migration scope.** Migratable continuations must use a named,
+   serialisable state type (Option A or the Option B macro).  The
+   clustering chapter has been updated to state this explicitly.
+
+**The layering justification.** The stackless design is not solely for
+migration — it is a layering decision that creates an execution layer
+strictly beneath the scheduler, analogous to Linux workqueues but
+without worker threads.  This is recorded in the review for
+documentation but is not a vulnerability to fix.
 
 ## 5. The page-clustering guarantee is real but narrow
 
