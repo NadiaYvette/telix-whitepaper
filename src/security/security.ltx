@@ -119,12 +119,22 @@ boundaries:
     into unforgeable, hardware-checked fat-pointer bounds
     (\S\ref{sec:mem_cheri}), strengthening the language boundary with
     hardware enforcement without paying address-space switch costs.
+    CHERI is an \emph{additional} boundary, not a primary one: Telix
+    must also run correctly on non-CHERI hardware, so no isolation
+    claim may presuppose its presence.
 \end{description}
 
-The two boundaries are complementary, not redundant: MMU isolation
-bounds the blast radius of a compromised large component; language
-isolation eliminates the switch cost \emph{only} for the small set of
-components that live inside the framekernel.
+The boundaries have a strict hierarchy.  MMU isolation is the
+\emph{primary} boundary and works on every target.  The manual-Iris
+proofs of the framekernel's \texttt{unsafe} blocks (\S\ref{ch:verification})
+are \emph{mandatory}: they are what close the gap between what the Rust
+type system promises and what the machine actually does.  Rust's type
+system is an \emph{additional} boundary — valuable, but not a substitute
+for the proofs.  CHERI is a further \emph{additional} boundary, applied
+only where the hardware provides it.  MMU isolation bounds the blast
+radius of a compromised large component; language isolation eliminates
+the switch cost \emph{only} for the small set of components that live
+inside the framekernel.
 
 \section{The Aspirational Boundary and Its Fallback}
 \label{sec:aspirational}

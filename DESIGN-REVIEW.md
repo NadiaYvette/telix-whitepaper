@@ -152,14 +152,49 @@ claim depends on the correctness of every one of these assertions.
    prototype components.  The writing of the number is deferred
    until the code base exists to measure it.
 
-4. **Is the isolation claim conditional?** The current wording
-   implies Rust safety is sufficient. A more honest formulation:
-   "The framekernel's language-level isolation is conditional on
-   either (a) manual-Iris proofs of every `unsafe` block, or (b)
-   CHERI hardware enforcing the same bounds in silicon. Until one
-   of those is true, the design relies on MMU isolation for the
-   privileged set and on Rust safety as an additional, not a
-   primary, boundary."
+4. **Is the isolation claim conditional?** Resolved (2026-08-24).
+   The author inverts the earlier framing: CHERI is an *additional*
+   boundary, not a primary one, because Telix must also run on
+   non-CHERI hardware and no isolation claim may presuppose it.
+   The hierarchy is:
+
+   1. **MMU isolation** — primary, works on every target, proven.
+   2. **Manual-Iris proofs of every `unsafe` block** — mandatory;
+      they close the gap between what Rust promises and what the
+      machine does.
+   3. **Rust's type system** — additional, not a substitute for the
+      proofs.
+   4. **CHERI hardware** — additional, applied only where present.
+
+   This is recorded in `security.ltx` §Isolation Primitives.
+
+### Edification note: assembly, linker scripts, and the proof
+
+The author raised the question of how the mandatory-Iris position
+treats the non-Rust artifacts: assembly modules and linker scripts.
+
+**Assembly modules.**  Privileged instruction sequences
+(`sfence.vma`, `mret`, `csrw satp`, interrupt entry/exit) are written
+in assembly, and Iris cannot "prove" them the way it proves Rust
+code, because they are not in the Iris language.  The resolution is
+the one already chosen in §3c decision 3: each assembly sequence
+gets a *trusted specification* that is a **specialisation of the Sail
+machine model's executable semantics**.  The kernel proof bottoms out
+on those specifications; the specification is validated against Sail
+(by construction, since it is derived from it) and audited by hand.
+This is exactly seL4's approach: hand-written abstract specs for
+assembly, with the C/Isabelle proof composed against the specs and
+the specs themselves hand-audited against the machine.
+
+**Linker scripts.**  Linker scripts determine memory layout (where the
+kernel image, stack, and data regions live), not runtime behaviour.
+They are not "proved" but *validated*: (a) the memory model in the
+proof must reflect the layout the linker script produces, and (b)
+build-time checks (section size assertions, address assertions) tie
+the binary's layout to the model.  The interaction is captured by
+making the address-space layout an input to the machine model, so a
+linker-script change that moves a region shows up as a proof
+obligation rather than silently changing the semantics.
 
 ## 2. No empirical validation anywhere in the design
 
