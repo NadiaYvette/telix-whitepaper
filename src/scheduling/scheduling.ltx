@@ -249,10 +249,28 @@ preempt that thread anywhere, including mid-poll in userspace.  When the
 future later blocks (hits an \texttt{await}) or its fair share is
 restored, it may be promoted back to the cooperative executor.
 
+\medskip\noindent
+\textbf{Stack teardown on promotion.}
+Promotion back to the cooperative executor is straightforward because
+the future's persistent state lives in the \texttt{Future} struct (the
+compiler-generated state-machine enum), not on the carrier thread's
+stack.  When the carrier thread's poll returns \texttt{Pending} at an
+\texttt{await} point, the future's state is already saved in the struct
+--- the same place it would be in the cooperative case.  The carrier
+thread simply returns from its poll loop, and the cooperative executor
+re-polls the same struct.  The carrier thread's stack is then returned
+to the pool (it was never the future's stack; it was the carrier's).  At
+no point does the future \emph{own} a stack --- the carrier does, and
+the carrier is transient.  The only cost of demotion is the carrier
+thread's stack memory for the duration of the demoted period; once the
+future returns to cooperative polling, that memory is freed.
+
 This mirrors the Linux pattern of demoting overrunning softirqs to
 \texttt{ksoftirqd} kthreads: the non-preemptible fast path is preserved,
 and a bounded escape hatch provides preemption for the tail that needs
-it.
+it.  The number of carrier threads is bounded by the number of cores:
+at most one demotion per core, so the worst-case stack memory overhead
+is $N \times \texttt{STACK\_SIZE}$, not $M \times \texttt{STACK\_SIZE}$.
 
 \begin{figure}[h]
 \centering
