@@ -100,11 +100,17 @@ This hybrid boundary has not been attempted in any prior system: it
 relies on Rust's safety promises holding in the hostile environment of
 a kernel address space shared with untrusted (but MMU-isolated) code.
 If the boundary proves unsound—if privilege escalation through the
-Rust type system cannot be ruled out—Telix degrades gracefully to a
-pure microkernel, with \emph{all} servers isolated by hardware MMU
-boundaries.  The rest of the architecture (page clustering, CPS state
-machines, capability transports, external pagers, the verification
-stack) does not depend on the framekernel boundary.
+Rust type system cannot be ruled out—the latency-motivated framekernel
+components (the LLFree allocator and scheduler management loop) are
+promoted to userspace servers, each behind an MMU boundary.  The
+privileged set — page-table manipulation, shared-page-table
+management, TLB shootdown, and IOMMU management — remains in the
+kernel, exactly where it would be in seL4, L4, or any microkernel.
+The rest of the architecture (page clustering, CPS state machines,
+capability transports, external pagers, the verification stack) does
+not depend on the allocator or scheduler being co-resident with the
+privileged set; the system runs either way, just slower in the
+degraded configuration.
 
 The control plane is complicated by adaptations to cover these
 matryoshka domains, where protection/isolation boundaries are

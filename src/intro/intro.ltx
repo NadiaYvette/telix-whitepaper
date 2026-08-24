@@ -37,9 +37,14 @@ domain goals:
 	    retain their own address spaces, kept out of the
 	    framekernel TCB.  This hybrid boundary is the most
 	    experimental aspect of the design (see
-	    \S\ref{ch:control-plane}); if it proves unsound, Telix
-	    degrades gracefully to a pure microkernel with all servers
-	    isolated.
+	    \S\ref{ch:control-plane}); if the language-level boundary
+	    proves unsound, the two latency-motivated components
+	    (the LLFree allocator and scheduler management loop) are
+	    promoted to userspace servers behind MMU boundaries,
+	    while the privileged set — page-table manipulation,
+	    shared-PT management, TLB shootdown, and IOMMU management
+	    — remains in the kernel, exactly where it sits in seL4,
+	    L4, or any microkernel.
 
     \item[Hybrid Continuation-Passing and Network-Structured Control
 	    Plane:] For fully asynchronous operation with efficiency

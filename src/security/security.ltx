@@ -115,16 +115,21 @@ components that live inside the framekernel.
 As stated in \S\ref{ch:control-plane}, the language-enforced boundary
 is the least validated part of the design.  It is therefore treated as
 an \emph{optimisation}, not a foundation: the architecture is specified
-so that, if the boundary cannot be made sound, every framekernel-resident
-component can be promoted to a userspace server at the cost of one
-additional MMU boundary.  The page-clustering, CPS, capability-transport,
-and verification components are all specified independently of which
-side of the boundary they sit on; only the \emph{latency} claim depends
-on the boundary holding.
+so that, if the boundary cannot be made sound, the two
+latency-motivated components (the LLFree allocator and scheduler
+management loop) are promoted to userspace servers at the cost of one
+additional MMU boundary each.  The privileged set (page-table
+manipulation, shared-PT management, TLB shootdown, IOMMU management)
+stays in the kernel regardless, exactly where it sits in any
+microkernel.  The page-clustering, CPS, capability-transport, and
+verification components are specified independently of which side of
+the boundary the allocator and scheduler sit on; only the
+\emph{latency} claim depends on co-residence.
 
 This is the honest position: Telix does not \emph{rely} on Rust safety
-for isolation until it is proven; it \emph{aspires} to it, and degrades
-to a proven (but slower) boundary if necessary.
+for isolation until it is proven; it \emph{aspires} to it for two
+components, and degrades those two (not the whole kernel) to a proven
+but slower boundary if necessary.
 
 \section{Side Channels and Covert Channels}
 \label{sec:side_channels}
