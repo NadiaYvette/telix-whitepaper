@@ -128,10 +128,11 @@ project's scope may ultimately rival Telix itself.
 
 The current limitation is cross-language type safety: every
 cross-language call uses a uniform \texttt{i64} ABI with symbol-name
-resolution, and soundness rests on the caller's discipline.  The
-methods for establishing a cross-language type discipline at the
-OrganIR level exist in the published literature, but implementing
-them has been deferred by time and human-attention constraints.  The
+resolution, and soundness rests on the caller's discipline.The methods for establishing a cross-language type discipline at the
+OrganIR level exist in the published literature — specifically,
+Patterson et al.~\footcite{patt22}'s framework for semantic
+soundness across language boundaries — but implementing them has been
+deferred by time and human-attention constraints.  The
 resulting gap is bounded: Telix's capability boundaries already
 enforce spatial safety at the message level, so the OrganIR type
 discipline is an additional correctness layer, not the sole line of
