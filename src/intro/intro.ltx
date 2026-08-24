@@ -89,6 +89,24 @@ two decades of hardware and language evolution:
     global descriptor array at the cost of a structural change
     to the allocator — a change that is impossible to retrofit
     into a mature kernel but straightforward in a new one.
+
+  \item[\textbf{Safe-language whole-system construction.}]
+    Singularity and Midori demonstrated that an entire operating
+    system — kernel, drivers, filesystems, network stack — can
+    be written in a safe, garbage-collected language and sealed
+    into software-isolated processes without hardware MMU
+    boundaries.  Both were research prototypes that never reached
+    production; both proved the concept.  Telix extends this
+    lineage with a key difference: rather than committing the
+    whole system to one safe language, Telix's framekernel
+    selectively pulls latency-critical components into a Rust
+    address space while the rest — including filesystem servers,
+    personality emulators, and device drivers written in
+    languages as varied as Haskell, Mercury, and Koka — run as
+    conventional microkernel processes.  The
+    Frankenstein\,/\,Organ Bank polyglot compilation stack
+    (Chapter~\ref{ch:polyglot}) is the toolchain that makes this
+    heterogeneity mechanically real.
 \end{description}
 
 In each case, Telix's claim is not that the idea is new.  The claim is
