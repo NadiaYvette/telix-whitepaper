@@ -8,7 +8,7 @@ Instead, the VFS and all concrete filesystem implementations operate entirely as
 \section{Decoupling Virtual Memory from the Filesystem}
 \label{sec:fs_vm_decoupling}
 
-Early proof-of-concept implementations of Telix tightly coupled VFS handling with the virtual memory layer to facilitate memory-mapped I/O (\texttt{mmap}). While common in monolithic kernels, this design violates microkernel isolation and complicates distributed caching.
+The first-round prototype of Telix tightly coupled VFS handling with the virtual memory layer to facilitate memory-mapped I/O (\texttt{mmap}).  The prototype demonstrated the feasibility of page clustering and morsel accounting at small scale, but its monolithic VFS/VM coupling violated microkernel isolation and complicated distributed caching.  This whitepaper describes the second-round prototype, which redesigns the architecture to correct those structural issues.
 
 In the revised Telix architecture, Virtual Memory and the VFS are strictly decoupled using the **External Pager** paradigm \footcite{liedtke95l4, abrossimov89mach}:
 \begin{enumerate}
