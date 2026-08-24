@@ -340,6 +340,35 @@ lists embedded inside the global page descriptor array). By relying on
 in-band metadata within free frames, \texttt{LLFree} further preserves
 the coremapless cache profile.
 
+\medskip
+\noindent
+\textbf{Independent validation: the Linux superpageblocks work.}
+While Telix approaches contiguity at the allocator's design level,
+the Linux memory-management community has independently converged on
+the same underlying problem from the opposite direction.  Van Riel's
+recent ``superpageblocks'' series
+\footcite{riel26superpageblocks} divides the buddy allocator into
+PUD-sized (1\,GiB) regions and applies placement policy to steer
+unmovable and reclaimable allocations into already-tainted blocks,
+keeping clean blocks available for 1\,GiB and 2\,MiB huge-page
+allocations.  Migration evacuates mixed blocks below a free threshold,
+and movable allocations are directed to the fullest clean blocks to
+maximise contiguity headroom elsewhere.
+
+The superpageblocks concept is, in effect, the buddy-allocator
+equivalent of the morsel: a large, contiguously-managed allocation
+region whose internal fragmentation state is tracked and whose
+external contiguity is preserved by policy.  Where Telix's morsels
+make this the \emph{primary} accounting unit (eschewing per-4KiB-page
+metadata entirely), van Riel's series retrofits the same structure
+atop the existing per-page \texttt{mem\_map[]}.  Both approaches
+recognise that the fundamental operational granularity of a modern
+memory manager should be a multi-page extent, not a single hardware
+page.  That the problem is urgent enough for Meta to fund work at this
+scale — 40 patches across the core page allocator, compaction, and
+migration — is the strongest independent validation that the morsel
+approach addresses a real, production-critical bottleneck.
+
 \section{Virtual Metadata, Hardware Walkers, and Inverted Page Tables}
 \label{sec:mem_virtual_metadata}
 
