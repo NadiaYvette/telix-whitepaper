@@ -1,0 +1,125 @@
+\chapter{Polyglot Compilation and the Frankenstein Toolchain}
+\label{ch:polyglot}
+
+Several design choices in this document — filesystem servers in
+``Haskell, Mercury, or Koka'' (\S\ref{sec:fs_language_abstraction}),
+personality servers as separate processes that could be written in any
+language, the M:N executor's dependence on Rust \texttt{async} — assume
+that multiple source languages can coexist in a single system image.
+That assumption is not gratuitous: it is backed by a separate
+toolchain project, \textbf{Frankenstein} and its companion
+\textbf{Organ Bank}, which together constitute a polyglot compiler
+pipeline targeting exactly the safe, capability-enforcing, CPS-friendly
+execution model Telix describes.
+
+This chapter shines a brief spotlight on them.  Neither project is
+load-bearing for the Telix design: a single-language Rust
+implementation is the fallback.  But they make \emph{real} the
+ambition, expressed in \S\ref{sec:fs_language_abstraction}, of writing
+filesystem and network logic in languages whose concurrency models
+match the problem rather than wrestling every driver into Rust.
+
+\section{Organ Bank: Harvesting Compiler Frontends}
+
+\textbf{Organ Bank} is a collection of shims, one per source language,
+that wrap real, battle-tested compiler frontends and extract their
+typed intermediate representations after frontend analysis.  The
+harvested IR is emitted in a common JSON interchange format called
+\textbf{OrganIR}.  Shims exist (or are scaffolded) for:
+
+\begin{quote}
+GHC (Haskell), rustc (Rust), mmc (Mercury), Idris~2, Lean~4, Koka,
+OCaml, Erlang/Elixir, PureScript, Swift, Agda, F\#, Scala~3, Julia,
+Zig, C, C++, Fortran, Ada, Standard ML, Common Lisp, Scheme, and
+Prolog.
+\end{quote}
+
+Rather than writing twenty-three parsers and twenty-three type
+checkers, Organ Bank reuses the real compilers as \emph{donors}.  Each
+shim invokes its host compiler's frontend, intercepts the typed AST or
+core IR, normalises it to OrganIR, and hands it off.  The name is
+deliberate: it is a harvesting facility for compiler organs, each one
+alive in its own right.
+
+\section{Frankenstein: Stitching Organs Together}
+
+\textbf{Frankenstein} is the polyglot compiler that consumes OrganIR
+from multiple frontends and stitches the pieces into a single native
+binary.  Its internal pipeline:
+
+\begin{enumerate}
+  \item A shared \textbf{Core IR} (inspired by Koka's Core, with
+    Perceus reference counting) receives the typed IR from each organ.
+  \item A cross-language linking phase resolves symbols and constructs
+    a unified call graph.
+  \item The Core IR is lowered to \textbf{MLIR} and then to
+    \textbf{LLVM} for native code generation.
+\end{enumerate}
+
+The philosophy is stated in its README: ``Like the original monster,
+Frankenstein is assembled from donor parts — each one alive in its own
+right.''
+
+\section{How This Serves Telix}
+
+The connection to Telix is not architectural but \emph{ecological}.
+None of Telix's claims depend on polyglot compilation.  But three
+design positions are \emph{amplified} by it:
+
+\begin{description}
+  \item[\textbf{Algebraic-effect filesystems.}] \S\ref{sec:fs_language_abstraction}
+    argues that moving the VFS to userspace lets storage servers be
+    written in languages where async I/O is an algebraic effect
+    (Koka, Haskell with effect libraries) rather than hand-rolled
+    state machines.  Organ Bank is what makes ``write the filesystem
+    in Koka'' an engineering path rather than a thought experiment.
+
+  \item[\textbf{Personality servers in their native languages.}]
+    A Windows personality could be a Rust process; a Linux personality
+    could be a Rust process.  But Organ Bank enables a Linux
+    personality written in Mercury (logic-programming strength for
+    filesystem traversal), a network stack in Haskell (declarative
+    protocol state machines), and a device driver in Zig (fine-grained
+    layout control).  Each runs as an isolated, untrusted server.
+
+  \item[\textbf{Verification decomposition.}] The verification
+    strategy (\S\ref{ch:verification}) verifies the framekernel core
+    in RefinedRust; external servers are verified separately or not at
+    all.  If a server is written in Idris~2 or Lean~4 — languages with
+    dependent types and native proof capabilities — its correctness
+    can be proved in its \emph{own} proof assistant, independent of
+    the Rocq/Iris stack, and the only inter-language obligation is the
+    capability-channel protocol.  Organ Bank's OrganIR provides the
+    typed interchange layer that makes this decomposition mechanical.
+\end{description}
+
+\section{Limitations and Status}
+
+As of 2026, Frankenstein and Organ Bank are functional for polyglot
+demos and self-host bootstrap, but do not yet enforce a cross-language
+type discipline at FFI boundaries: every cross-language call is a
+uniform \texttt{i64} ABI with symbol-name resolution, and soundness
+rests on the demo author's discipline.  A cross-language FFI type
+checker — operating at the OrganIR level to verify that argument and
+return types agree across the language boundary — is the next design
+milestone.
+
+This is not a defect for Telix, because Telix's capability boundaries
+are already enforced at the \emph{message} level: a personality server
+receives capability tokens, not raw pointers, and the IOMMU/MMU
+enforces spatial bounds regardless of what language the server was
+written in.  Frankenstein's type discipline across language boundaries
+is an additional safety layer, not a prerequisite.
+
+\section{The Singularity Lineage}
+
+The lineage is deliberate.  Singularity \footcite{hunt07singularity}
+demonstrated that a whole OS could be written in a safe language
+(Sing\#) with sealed processes and typed IPC.  Midori extended the
+idea to a production system in C\#.  Telix updates the lineage to
+Rust, and Frankenstein takes the next step: \emph{any} safe language,
+stitched together by a common compiler pipeline.  The three projects
+— Telix, Frankenstein, and Organ Bank — are independent efforts that
+reinforce each other but are not coupled: any one of them delivers
+value alone; together they enable a polyglot, capability-enforcing,
+formally decomposable system software stack.
