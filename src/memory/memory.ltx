@@ -248,6 +248,33 @@ because the modal allocation size is $Z$, the TLB refill path can be
 optimized for $Z$-sized translations, with fast-paths for smaller
 ($K$-sized) fault fills and slow-paths for the uncommon large superpages.
 
+More fundamentally, the shift in the distribution raises the
+\textbf{expected translation size} and therefore the \textbf{TLB reach}.
+Without \pageclustering, the translation-size distribution is
+approximately exponential with mean near $K$ (the overwhelming majority
+of mappings use the smallest page size).  The TLB reach — the total
+virtual address range covered by the TLB's finite entry budget — is
+correspondingly small, and TLB misses are dominated by capacity evictions
+of $K$-sized entries.
+
+With \pageclustering, the $Z$ attractor herds the left tail of the
+distribution upward:\, the mass that would have been concentrated at $K$
+is redistributed toward $Z$, and the mean translation size rises from
+$\approx K$ (or barely above it) to something approaching $Z$.  Because
+TLB reach is simply $\text{TLB entries} \times \mathbb{E}[\text{translation
+size}]$, even a modest increase in the mean — say, from 4~KiB to
+64~KiB — yields a $16\times$ expansion of TLB coverage with no change
+to the hardware TLB.  The TLB miss rate drops accordingly, and the
+pressure on the page-table walker (hardware or software) is reduced.
+
+Very large superpages ($\gg Z$) are still needed for extreme-footprint
+workloads (database buffer pools, HPC arrays), but these are served by
+the long right tail of the distribution and addressed through orthogonal
+mechanisms (hardware superpage promotion, contiguous allocation hints).
+\pageclustering's contribution is to address the \emph{left} side of
+the distribution — the mass of small mappings that would otherwise
+dominate TLB pressure — and to pull it reliably toward $Z$.
+
     \item[\textbf{Small Minimum Mapping Granularities ($K$):}] There are
 	    few lower-bound constraints on $K$. In principle, user PTEs
 		need not even be smaller than the mapped memory; page
