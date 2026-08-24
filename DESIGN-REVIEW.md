@@ -70,10 +70,43 @@ expansion, sublinear metadata, fault latency reduction, migration cost
 argument for page clustering (the unimodal Z-attractor) is presented as
 "empirical" but is, so far, a *prediction*, not a measurement.
 
-**What would answer it.** Label the distributional claim as a hypothesis
-to be tested; commit to a concrete evaluation plan (which workloads, which
-hardware, which baseline kernels, which metrics); and avoid the word
-"empirical" for anything not yet measured.
+**Status (2026-08-24).** The author decomposes the validation burden
+into three tiers, each with a different strategy:
+
+1. **Validated by prior publication (inherit).** Many individual
+   mechanisms carry their own empirical evidence from the papers that
+   introduced them: LLFree (Litz et al. on lock-free allocator latency),
+   superpageblocks (van Riel's 40-patch series with production
+   measurements), scheduler activations (Anderson et al. benchmarks),
+   FlexSC/io\_uring (Soares & Axboe throughput results), page clustering
+   (Dickins' 64 GiB x86 boot, the historic Linux ports to 22
+   architectures).  The whitepaper should cite each of these explicitly
+   as *validated-in-isolation* and not claim to re-validate them.
+
+2. **Page clustering (must validate).** The Z-attractor distributional
+   claim, the smaller-superpage guarantee, the TLB-reach expansion
+   argument, and the dense-spectra allocation behaviour are the
+   genuinely unvalidated pieces.  These are the motivating hypotheses
+   of the Telix project and should be stated as such.  Empirical
+   validation of page clustering is properly scoped as Telix's core
+   evaluation.
+
+3. **Compositional burden (must validate).** Even if every individual
+   mechanism passes its own validation, the *combination* — morsel
+   allocator feeding external pagers, stackless futures carrying CPS
+   state through M:N executors, capability transports spanning
+   framekernel and cluster boundaries — may exhibit emergent
+   behaviours (contention, interference, pathological cascades) that no
+   individual paper measured.  This is the burden any system combining
+   novel components bears, and Telix cannot escape it.  It should be
+   claimed as part of the project's evaluation scope.
+
+**What would answer it.** Rewrite the whitepaper's empirical language to
+(a) distinguish inherited validation from Telix-specific hypotheses,
+(b) label the page-clustering distribution and the composition are both
+as evaluation targets, not established results, and (c) commit to a
+concrete evaluation plan naming workloads, hardware, baseline kernels,
+and metrics.
 
 ## 3. The verification-to-implementation gap
 

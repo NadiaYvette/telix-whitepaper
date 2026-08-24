@@ -182,17 +182,17 @@ operational benefits depending on this spectrum:
     \mathop{\mathrm{lg}}B = \beta &\approx (W-\Omega)_+
 \end{align}
 
-    Here, $\Omega$ can be empirically tuned (where $\Omega = 2$ or
+    Here, $\Omega$ can be tuned (where $\Omega = 2$ or
 	$\Omega = 3$ are likely optimal) to balance the success rate of
 	allocating superpages of the first nontrivial size ($g_1$)
 	against the intensive latency mitigation and internal
 	fragmentation management required to support such a $Z$. The
 	larger the $Z$, the more aggressive these mitigation measures
-	must be. Provisional empirical results suggest approximately
-	256~KiB is tolerable without dedicated mitigation, albeit
-	primarily for interactive user workloads. Historical Linux
-	porting efforts also found 256~KiB required minimal retrofit
-	effort, whereas exceeding the Page Middle Directory size
+	must be. Historical Linux porting experience — Dickins' 2003
+	64\,GiB x86 boot and the subsequent ports to 22 architectures
+	\footcite{dick01} — found approximately 256~KiB required
+	minimal retrofit effort for interactive user workloads,
+	whereas exceeding the Page Middle Directory size
 	($\texttt{PAGE\_SIZE} > \texttt{PMD\_SIZE}$) introduced
 	qualitative difficulties due to the truncation of the page table
 	hierarchy.
@@ -223,8 +223,9 @@ operational benefits depending on this spectrum:
 
 \bigskip
 \noindent
-\textbf{Empirical Effect on the Superpage-Size Distribution.}
-Without \pageclustering, the empirical frequency of translation sizes
+\textbf{Predicted Effect on the Superpage-Size Distribution
+  (Hypothesis).}
+Without \pageclustering, the expected frequency of translation sizes
 in a typical workload follows a monotonically decreasing distribution:
 most mappings use the smallest hardware page size ($K$), each successive
 superpage size $g_n$ sees exponentially fewer mappings, and the tail
@@ -234,7 +235,7 @@ contiguity drop-off of the buddy-allocator literature.
 With \pageclustering, the allocation unit $Z$ acts as an attractor.
 Because allocations of size $Z$ are guaranteed never to fail due to
 external fragmentation, the memory manager preferentially (and
-reliably) serves requests at that boundary.  The empirical distribution
+reliably) serves requests at that boundary.  The expected distribution
 shifts from a monotone decreasing exponential to a \textbf{unimodal,
 right-skewed bell}:
 \begin{itemize}
@@ -284,6 +285,27 @@ mechanisms (hardware superpage promotion, contiguous allocation hints).
 \pageclustering's contribution is to address the \emph{left} side of
 the distribution — the mass of small mappings that would otherwise
 dominate TLB pressure — and to pull it reliably toward $Z$.
+
+\medskip
+\noindent
+\textbf{Hypothesis, not yet measured.}
+The distributional argument above is a \emph{prediction} derived from
+the structural guarantee (no external fragmentation at $Z$) and the
+behaviour of existing page-clustering implementations at smaller scale
+(Dickins' x86 and 22-architecture ports).  The unimodal distribution,
+the TLB-reach expansion factor, and the interaction with replacement
+policy under realistic workloads are hypotheses to be evaluated as part
+of the Telix project's empirical programme, not established results.
+Individual mechanisms that compose into the page-clustering
+architecture carry their own validation from prior work: LLFree's
+lock-free latency characteristics \footcite{litz2021llfree},
+superpageblocks' production measurements at Meta
+\footcite{riel26superpageblocks}, Dickins' historic x86 and
+multi-architecture page-clustering ports
+\footcite{dick01}, and io\_uring's throughput benchmarks
+\footcite{axboe19iouring}.  The \emph{combination} of these mechanisms
+into a single system is an additional evaluation burden belonging to
+the Telix project itself.
 
     \item[\textbf{Small Minimum Mapping Granularities ($K$):}] There are
 	    few lower-bound constraints on $K$. In principle, user PTEs
