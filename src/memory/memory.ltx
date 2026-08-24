@@ -266,44 +266,68 @@ because the modal allocation size is $Z$, the TLB refill path can be
 optimized for $Z$-sized translations, with fast-paths for smaller
 ($K$-sized) fault fills and slow-paths for the uncommon large superpages.
 
-More fundamentally, the shift in the distribution raises the
-\textbf{expected translation size} and therefore the \textbf{TLB reach}.
-Without \pageclustering, the translation-size distribution is
-approximately exponential with mean near $K$ (the overwhelming majority
-of mappings use the smallest page size).  The TLB reach — the total
-virtual address range covered by the TLB's finite entry budget — is
-correspondingly small, and TLB misses are dominated by capacity evictions
-of $K$-sized entries.
+More fundamentally, \emph{if} the distributional shift materialises
+as hoped, it raises the \textbf{expected translation size} and
+therefore the \textbf{TLB reach}.
 
-With \pageclustering, the $Z$ attractor herds the left tail of the
-distribution upward:\, the mass that would have been concentrated at $K$
-is redistributed toward $Z$, and the mean translation size rises from
-$\approx K$ (or barely above it) to something approaching $Z$.  Because
-TLB reach is simply $\text{TLB entries} \times \mathbb{E}[\text{translation
-size}]$, even a modest increase in the mean — say, from 4~KiB to
-64~KiB — yields a $16\times$ expansion of TLB coverage with no change
-to the hardware TLB.  The TLB miss rate drops accordingly, and the
-pressure on the page-table walker (hardware or software) is reduced.
+\medskip\noindent
+\textbf{The TLB-architecture precondition.}
+This argument presupposes a TLB whose reach can actually vary with
+the translation-size distribution — i.e., a \emph{unified} or
+size-tagged TLB in which each entry can cache any translation size.
+Intel's size-segregated TLB hierarchy (separate arrays for 4~KiB
+and 2~MiB entries) defeats this: the 4~KiB array cannot cache a
+64~KiB translation, so herding the distribution toward $Z$ does not
+expand reach in that array.  The custom MMU's residue-partitioned
+TLB (\S\ref{sec:custom_mmu}) is explicitly designed to avoid this
+trap: four partitions keyed by $\lg g \bmod 4$ each span the full
+size range, so every partition's reach grows with the mean
+translation size.  On architectures with segregated TLBs, the
+benefit is limited to whatever array natively holds the $Z$-sized
+translations.
+
+\medskip\noindent
+\textbf{The hoped-for distributional shift.}
+Without \pageclustering, the translation-size distribution is
+approximately geometric (monotonically decreasing): the overwhelming
+majority of mappings use the smallest page size $K$, each successive
+superpage size sees exponentially fewer mappings, and the tail beyond
+$g_2$ is negligible.  The TLB reach — $\text{TLB entries} \times
+\mathbb{E}[\text{translation size}]$ — is correspondingly small, and
+TLB misses are dominated by capacity evictions of $K$-sized entries.
+
+The hope is that \pageclustering, by guaranteeing that $Z$-sized
+allocations never fail due to external fragmentation, shifts this
+distribution from a geometric decay to something resembling a
+unimodal, right-skewed bell (informally, a negative-binomial-shaped
+distribution with mode near $Z$).  The mass that would have been
+concentrated at $K$ is redistributed toward $Z$, and the mean
+translation size rises from $\approx K$ toward $Z$.  \emph{If} this
+shift occurs and the TLB is unified (as above), then a modest rise in
+the mean — say, from 4~KiB to 64~KiB — would yield a $16\times$
+expansion of TLB coverage with no change to the hardware TLB, and the
+TLB miss rate would drop accordingly.
+
+This is a hoped-for outcome, not a theorem.  The structural guarantee
+(no external fragmentation at $Z$) is proved; the distributional
+consequence (the shift from geometric to unimodal) is a prediction
+requiring empirical validation.  The interaction with replacement
+policy under realistic workloads is an additional unknown: a
+page-replacement daemon that fragments $Z$-sized extents under
+pressure could partially undo the attractor effect.
 
 Very large superpages ($\gg Z$) are still needed for extreme-footprint
 workloads (database buffer pools, HPC arrays), but these are served by
 the long right tail of the distribution and addressed through orthogonal
 mechanisms (hardware superpage promotion, contiguous allocation hints).
-\pageclustering's contribution is to address the \emph{left} side of
-the distribution — the mass of small mappings that would otherwise
-dominate TLB pressure — and to pull it reliably toward $Z$.
+\pageclustering's hoped-for contribution is to address the \emph{left}
+side of the distribution — the mass of small mappings that would
+otherwise dominate TLB pressure — and to pull it toward $Z$.
 
 \medskip
 \noindent
-\textbf{Hypothesis, not yet measured.}
-The distributional argument above is a \emph{prediction} derived from
-the structural guarantee (no external fragmentation at $Z$) and the
-behaviour of existing page-clustering implementations at smaller scale
-(Dickins' x86 and 22-architecture ports).  The unimodal distribution,
-the TLB-reach expansion factor, and the interaction with replacement
-policy under realistic workloads are hypotheses to be evaluated as part
-of the Telix project's empirical programme, not established results.
-Individual mechanisms that compose into the page-clustering
+\textbf{Prior-work validation and the combination burden.}
+The individual mechanisms that compose into the page-clustering
 architecture carry their own validation from prior work: LLFree's
 lock-free latency characteristics \footcite{litz2021llfree},
 superpageblocks' production measurements at Meta
