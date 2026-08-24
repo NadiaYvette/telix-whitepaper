@@ -222,7 +222,7 @@ a kernel-specific proof. It composes the hardware theorems
 four-step protocol (invalidate → local flush → IPI → wait) is entitled to
 \texttt{tlb\_flushed}. The kernel's job is to follow the protocol.
 
-\section{Kernel Verification via RefinedRust}
+\section{Kernel Verification via Manual Iris}
 \label{sec:kernel_verification}
 
 \subsection{Toolchain Selection}
@@ -302,8 +302,8 @@ specification is tractable, and the semantic gap must be auditable.
 
 \begin{itemize}
   \item The machine interface layer (\S\ref{sec:machine_interface}) can be
-        directly imported as Iris resources into RefinedRust's Coq model
-        of the kernel.
+        directly imported as Iris resources into the kernel-level
+        Iris heap\_lang specification.
   \item A kernel function like \texttt{unmap\_range()} gets an Iris spec:
         $\{\ \texttt{pte\_token}(va, pa, perm) *
            \texttt{tlb\_entry}(va)\ \}\
@@ -312,7 +312,7 @@ specification is tractable, and the semantic gap must be auditable.
            \neg\texttt{pte\_token}(va, pa, perm)\ \}$.
   \item The hardware's \texttt{bc\_broadcast\_spec} theorem guarantees
         that following the protocol achieves
-        $\texttt{tlb\_flushed}(va)$. RefinedRust proves the kernel follows
+        $\texttt{tlb\_flushed}(va)$. The kernel's Iris proof shows it follows
         the protocol. The two proofs compose.
 \end{itemize}
 

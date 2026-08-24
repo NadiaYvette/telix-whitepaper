@@ -71,7 +71,7 @@ Telix differs in three ways that are not incremental:
   \item \textbf{Verification style.} seL4's proof is a heroic,
     single-implementation, per-ISA effort.  Telix's stated approach is
     compositional: hardware proofs (Tessera) independent of the kernel,
-    then a machine-interface Iris layer, then RefinedRust.  Whether this
+    then a machine-interface Iris layer, then manual Iris proofs.  Whether this
     is \emph{easier} than the seL4 path is unproven; the claim is only
     that it is a different decomposition.
 
@@ -192,7 +192,7 @@ novel claims:
 
   \item \textbf{The verification decomposition} --- hardware proofs
     independent of the kernel, bridged by a machine-interface Iris
-    layer, then RefinedRust --- as an alternative to the seL4
+    layer, then manual Iris proofs --- as an alternative to the seL4
     monolithic-proof path (\S\ref{sec:unified_stack}).
 
   \item \textbf{M:N stackless-future execution with stack-carrier

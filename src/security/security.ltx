@@ -50,7 +50,7 @@ claim.  Telix's \TCB is deliberately asymmetric:
     shootdown, IPI delivery, IOMMU management, the \LLFree allocator,
     and the scheduler's management loop) is trusted.  It is small
     (\textasciitilde{}3,000--5,000 lines of Rust), written in the
-    interrupt/CPS style, and is the target of the RefinedRust proofs
+    interrupt/CPS style, and is the target of the manual Iris proofs
     (\S\ref{sec:kernel_verification}).
 
   \item \textbf{External pagers, personality servers, filesystem and
@@ -59,7 +59,7 @@ claim.  Telix's \TCB is deliberately asymmetric:
     extend its capability bounds.
 
   \item \textbf{The compiler and proof toolchain} (Rust toolchain,
-    Rocq, Iris, RefinedRust, the Sail backend) are trusted in the
+    Rocq, Iris, gpfsl, the Sail backend) are trusted in the
     traditional sense that a compiler is trusted: the guarantees hold
     \emph{relative to} their correctness.  This is the same assumption
     seL4 makes of Isabelle/HOL and its compiler pipeline.
@@ -240,7 +240,7 @@ Device cannot DMA outside its window
   & IOMMU page tables per PCIe domain
   & IOMMU management proof \\
 Framekernel core memory-safe
-  & Rust + (proposed) RefinedRust proofs
+  & Rust + (proposed) manual Iris proofs
   & Toolchain correctness; $=$unsafe$=$ audit \\
 Thin layers share address space safely
   & Rust type system (language isolation)

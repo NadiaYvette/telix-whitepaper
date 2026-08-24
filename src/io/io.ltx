@@ -129,8 +129,9 @@ transport of raw blocks, packets, and IPC messages, they do not dictate
 the structural semantics of hierarchical storage.
 
 Translating raw block I/O into a distributed, capability-indexed
-namespace requires conflict-free replicated data types (CRDTs),
+namespace requires close-to-open consistency (NFSv4 model),
 lease-based mutation, and robust distributed caching logic. The
 architecture of the Telix Distributed Filesystem and its integration
-with the unified Port Set notification model is detailed extensively in
-Chapter~\ref{ch:filesystem}.
+with the unified Port Set notification model is detailed in
+Chapter~\ref{ch:filesystem} and the three-tier consistency model in
+Chapter~\ref{ch:clustering}.
