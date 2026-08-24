@@ -455,6 +455,61 @@ software-refill architectures provide a net performance benefit over
 direct ART/B+ extent tree walks, treating software-refill IPT
 optimizations as a primary experimental benchmark for the project.
 
+\subsection{Custom Inverted-Page-Table MMU (satp modes 14/15)}
+\label{sec:custom_mmu}
+
+As a research prototype demonstrating the full range of the
+\pageclustering\ thesis, Telix specifies a forward-looking RISC-V
+MMU extension that replaces the hardware radix-tree walker with an
+\emph{inverted (hashed) page table}.
+
+\begin{description}
+  \item[\textbf{Two additional \texttt{satp} modes.}] Mode 14 selects
+    the bare inverted page table (hash-based, no hardware walker);
+    mode 15 adds a POWER9-style Segment Lookaside Buffer (SLB) as a
+    gating cache.  The existing Sv39/Sv48/Sv57 modes are unaffected.
+    Because there is no radix tree to walk, the full 64-bit virtual
+    address space is used rather than truncating at 48 or 57 bits.
+
+  \item[\textbf{56 distinct superpage sizes.}] With a base page
+    $K = 256$~B (half the VAX-11's 512~B) and a jump increment
+    $W = 1$, the extension represents $g_n = K \cdot 2^{n}$ for
+    $n \in [0, 55]$, from 256~B to 8~EiB.  On a conventional radix
+    tree a 256~B page would be catastrophic (a 48-bit VA yields
+    $2^{40}$ pages and a 16-level tree).  An inverted table is sized
+    to the number of \emph{mappings}, not pages, so larger
+    translations \emph{shrink} the table.  \pageclustering\ supplies
+    the fine-granularity COW/sharing behaviour at the bottom while
+    superpages supply TLB reach at the top.
+
+  \item[\textbf{Partner-hashed table.}] The table uses partner
+    hashing (Bender--Kuszmaul--Zhou) to run at load factor 1 with
+    $O(1)$ expected queries and high-probability $O(1)$
+    insert/delete, with the permutation of entries encoding per-entry
+    metadata rather than storing it explicitly.  The hash is
+    superpage-aware: all virtual addresses within one superpage hash
+    to the same slot.
+
+  \item[\textbf{Residue-partitioned TLB.}] Four TLB partitions are
+    keyed by $\lg g \bmod 4$, so each partition spans the
+    \emph{entire} size range and the TLB remains expansible — unlike
+    Intel's segregated TLB hierarchy, which can never cache a
+    superpage in its base-page arrays.
+
+  \item[\textbf{SLB (mode 15).}] A 256-entry segment cache maps a
+    16~PiB segment (a 50-bit segment boundary chosen to exceed any
+    realistic superpage, so no single superpage crosses a segment
+    boundary) to its segment-table pointer, narrowing the inverted-table
+    probe on hit.
+\end{description}
+
+The extension is modelled in Sail and mechanically generated to Rocq,
+with machine-checked proofs of hash determinism, superpage-consistency,
+partition well-definedness, and TLB-coverage agreement in the Tessera
+hardware model, and a QEMU simulation branch exercising modes 14 and 15.
+It is a research prototype: hardware implementation would require
+RISC-V ratification of the new \texttt{satp} encodings.
+
 \section{Low-Latency Optimization: Incremental Faulting and Tail Packing}
 \label{sec:mem_latency_opt}
 
