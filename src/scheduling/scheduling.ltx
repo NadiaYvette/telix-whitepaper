@@ -132,7 +132,7 @@ independently-validated mechanism:
     executing it blocks, and the $M-1$ other user threads sharing that
     kernel thread stall.  Telix avoids this entirely: all I/O is
     submitted through memory-mapped submission rings
-    (\texttt{io\_uring}-style~\footcite{axbo19}), a future awaiting
+    (\texttt{io\_uring}-style, a concept originating in FlexSC~\footcite{soar10,axbo19}), a future awaiting
     I/O returns \texttt{Poll::Pending} without the kernel executor ever
     entering a blocking path, and the executor immediately polls the
     next eligible future.  The kernel executor never blocks on a
@@ -175,7 +175,7 @@ model was not wrong — it was premature.  Anderson et al.
 with kernel cooperation) but lacked the mechanisms that make it
 implementable without the fragile upcall machinery that sank
 first-generation M:N kernels.  Io\_uring-style submission rings were
-not described until Axboe (2019); memory-mapped completion rings are
+not described until Soares \& Stumm's FlexSC (2010)~\footcite{soar10} and later popularised by Axboe's io\_uring (2019)~\footcite{axbo19}; memory-mapped completion rings are
 infeasible without wide cache-coherent memory hierarchies; stackless
 futures require a language-level async abstraction that did not exist
 in C.  The abandonment of M:N in kernels was historically correct given
