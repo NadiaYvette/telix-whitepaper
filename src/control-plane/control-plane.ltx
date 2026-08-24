@@ -83,11 +83,32 @@ model and enters through a FlexSC/\iouring-style completion interface.
   \label{fig:kernel-nesting}
 \end{figure}
 
-The control plane is complicated by adaptations to cover those 4
-domains, which are intended to coexist and nest something akin to
-matryoshka dolls. Protection/isolation boundaries are deliberately
-placed so as to align hardware-affinity boundaries with
-protection/isolation boundaries. Telix is intended to place protection boundaries so they align with natural hardware boundaries.
+\bigskip
+\noindent
+\textbf{Aspirational boundary, not a proven one.}
+The framekernel segment of the matryoshka is the least validated layer
+in the Telix design.  Unlike Asterinas, which brings \emph{all}
+microkernel servers into a single Rust-enforced address space, Telix
+only pulls in thin, performance-critical layers (page-table
+manipulation, shootdown, the LLFree allocator) where the static
+guarantees of Rust's type system plausibly substitute for hardware MMU
+isolation.  The remaining servers—external pagers, personality
+servers, filesystem servers, device drivers—run as conventional
+isolated processes.
+
+This hybrid boundary has not been attempted in any prior system: it
+relies on Rust's safety promises holding in the hostile environment of
+a kernel address space shared with untrusted (but MMU-isolated) code.
+If the boundary proves unsound—if privilege escalation through the
+Rust type system cannot be ruled out—Telix degrades gracefully to a
+pure microkernel, with \emph{all} servers isolated by hardware MMU
+boundaries.  The rest of the architecture (page clustering, CPS state
+machines, capability transports, external pagers, the verification
+stack) does not depend on the framekernel boundary.
+
+The control plane is complicated by adaptations to cover these
+matryoshka domains, where protection/isolation boundaries are
+deliberately aligned with hardware-affinity boundaries.
 
 \section{Protection/Affinity Dual-Purpose Boundaries}
 

@@ -26,13 +26,20 @@ domain goals:
 
     \item[Hardware Partitioning and Safety Domain Isolation:] Systems
 	    are partitioned per the Barrelfish multikernel model
-	    \footfullcite{baum09} into decoupled message-passing nodes.
-	    Within each multikernel partition, shared-memory domains
-	    utilize the \Asterinas\ \framekernel\ architecture
-	    \footfullcite{peng24} to enforce safe Rust-based
-	    intra-kernel privilege separation alongside formal
-	    verification principles derived from \seLFour
-	    \footfullcite{klei09}.
+	    \footfullcite{baum09} into decoupled message-passing nodes
+	    (one kernel instance per NUMA node, rather than per core).
+	    Within each multikernel partition, Telix selectively adapts
+	    the \Asterinas\ \framekernel\ technique
+	    \footfullcite{peng24}: thin, performance-critical server
+	    layers are pulled into the main kernel address space and
+	    protected by Rust's compile-time safety guarantees rather
+	    than by hardware MMU isolation.  The remaining servers
+	    retain their own address spaces, kept out of the
+	    framekernel TCB.  This hybrid boundary is the most
+	    experimental aspect of the design (see
+	    \S\ref{ch:control-plane}); if it proves unsound, Telix
+	    degrades gracefully to a pure microkernel with all servers
+	    isolated.
 
     \item[Hybrid Continuation-Passing and Network-Structured Control
 	    Plane:] For fully asynchronous operation with efficiency
