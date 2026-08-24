@@ -369,10 +369,32 @@ fragments of a $Z$-extent are immediately reclaimable.
 Very large superpages ($\gg Z$) are still needed for extreme-footprint
 workloads (database buffer pools, HPC arrays), but these are served by
 the long right tail of the distribution and addressed through orthogonal
-mechanisms (hardware superpage promotion, contiguous allocation hints).
+mechanisms (hardware superpage promotion, contiguous allocation hints,
+or production systems like superpageblocks \footcite{riel26superpageblocks}).
 \pageclustering's hoped-for contribution is to address the \emph{left}
 side of the distribution — the mass of small mappings that would
 otherwise dominate TLB pressure — and to pull it toward $Z$.
+
+\medskip
+\noindent
+\textbf{Scope of the modelled distribution.}
+The geometric-to-unimodal shift depicted in Figure~\ref{fig:pgcl_distribution}
+is modelled under the simplifying assumption that few or no
+other superpaging interventions are active.  In a realistic deployment,
+both the baseline and Telix's proposed design would also use
+mechanisms capable of creating very large contiguous translations
+(superpageblocks, hardware promotion, contiguous allocation hints).
+These mechanisms introduce a second peak in the distribution at the
+far right (giant translations covering hundreds of megabytes or more),
+but the effect of that peak is difficult to quantify: the fraction of
+giant translations that are truly resident and actively accessed is
+often unclear, making the TLB-reach contribution of the right-tail
+peak hard to assess.  What \emph{can} be assessed is the mid-range
+($K$ through $Z$ through $g_2$), where page clustering's contribution
+is concentrated.  Once giant contiguous translations are already in
+place via orthogonal mechanisms, the remaining pain point is precisely
+the mass of small mappings below $Z$ --- the left side of the
+distribution that page clustering targets.
 
 \medskip
 \noindent
