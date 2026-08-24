@@ -72,7 +72,10 @@ interoperation via policy as \OpenHarmony.
 \section{Foreign ABI Emulation and Subsystem Personalities}
 \label{sec:foreign_abi_emulation}
 
-While native Telix applications interact directly with capability tokens and async continuation rings, supporting legacy and component ecosystem binaries requires mapping foreign Application Binary Interfaces (ABIs) onto native primitives.
+While native Telix applications interact directly with capability tokens
+and async continuation rings, supporting legacy and component ecosystem
+binaries requires mapping foreign Application Binary Interfaces (ABIs)
+onto native primitives.
 
 Rather than embedding foreign OS syscall handlers inside the
 Framekernel, Telix delegates ABI emulation to isolated user-space
@@ -80,7 +83,9 @@ Framekernel, Telix delegates ABI emulation to isolated user-space
 
 \subsection{Trap Redirection and User-Space Interception}
 
-When an unmodified foreign binary executes a hardware system call trap (e.g., x86 \texttt{syscall}, ARM \texttt{svc}, or RISC-V \texttt{ecall}), execution is handled via one of two paths:
+When an unmodified foreign binary executes a hardware system call trap
+(e.g., x86 \texttt{syscall}, ARM \texttt{svc}, or RISC-V
+\texttt{ecall}), execution is handled via one of two paths:
 
 \begin{description}
     \item[\textbf{Fast-Path vDSO / Libc Shim:}] For dynamically linked workloads, Telix supplies a specialized user-space shim library (\texttt{vDSO} or custom \texttt{libc}) that intercepts system call invocations before triggering a hardware trap, encoding the request directly into a native capability ring submission.
@@ -91,7 +96,9 @@ When an unmodified foreign binary executes a hardware system call trap (e.g., x8
 \subsection{Linux POSIX Personality Server}
 \label{sec:linux_personality}
 
-The Linux personality server provides POSIX compatibility by wrapping monolithic Linux abstractions around Telix capabilities \footcite{daSilva20wsl}:
+The Linux personality server provides POSIX compatibility by wrapping
+monolithic Linux abstractions around Telix capabilities
+\footcite{daSilva20wsl}:
 
 Memory-management system calls (\texttt{mmap}, COW faults, \texttt{fork})
 are not implemented inside the personality server.  They are translated
@@ -109,9 +116,12 @@ processes.
 \subsection{Windows NT Subsystem Emulation}
 \label{sec:windows_personality}
 
-Unmodified Portable Executable (PE) binaries expecting the Windows Native API (\texttt{Nt*} / \texttt{Zw*} routines) are served by the NT personality server \footcite{wine_design}.
+Unmodified Portable Executable (PE) binaries expecting the Windows
+Native API (\texttt{Nt*} / \texttt{Zw*} routines) are served by the NT
+personality server \footcite{wine_design}.
 
-Opaque Windows \texttt{HANDLE} references are mapped directly into Telix capability slots:
+Opaque Windows \texttt{HANDLE} references are mapped directly into Telix
+capability slots:
 
 \begin{table}[h]
 \centering
@@ -135,7 +145,8 @@ Opaque Windows \texttt{HANDLE} references are mapped directly into Telix capabil
 \subsection{Next-Gen Component ABIs: Zircon \& \OpenHarmony}
 \label{sec:nextgen_abis}
 
-In addition to legacy monolithic ABIs, Telix natively supports modern component-oriented architectures:
+In addition to legacy monolithic ABIs, Telix natively supports modern
+component-oriented architectures:
 
 \begin{description}
     \item[\textbf{Fuchsia / Zircon ABI}] \footcite{fuchsia_zircon}: Zircon relies on Object Handles and Channel Message passing (FIDL). Because Telix's native capability model is structurally isomorphic to Zircon handles, Zircon syscalls exhibit near 1:1 translation efficiency into native Telix capability channels.

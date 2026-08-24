@@ -1,16 +1,32 @@
 \chapter{Asynchronous I/O and Capability Transports}
 \label{ch:io}
 
-High-performance microkernel I/O architectures face a persistent dichotomy. Traditional synchronous IPC provides elegant network transparency but incurs severe overhead during bulk data transfer. Conversely, modern shared-memory ring buffers (such as \texttt{io\_uring}) provide massive bulk throughput by amortizing syscall overhead, but introduce unnecessary latency and memory contention when used for intra-kernel communication where no privilege boundary exists.
+High-performance microkernel I/O architectures face a persistent
+dichotomy. Traditional synchronous IPC provides elegant network
+transparency but incurs severe overhead during bulk data transfer.
+Conversely, modern shared-memory ring buffers (such as
+\texttt{io\_uring}) provide massive bulk throughput by amortizing
+syscall overhead, but introduce unnecessary latency and memory
+contention when used for intra-kernel communication where no privilege
+boundary exists.
 
-Telix resolves this via a unified, **purely asynchronous I/O model**. By fusing traditional capability ports with dynamically bound lock-free memory rings, Telix provides a single unified notification subsystem for network, IPC, and storage events, ensuring cluster-wide extensibility without sacrificing local bare-metal throughput.
+Telix resolves this via a unified, **purely asynchronous I/O model**. By
+fusing traditional capability ports with dynamically bound lock-free
+memory rings, Telix provides a single unified notification subsystem for
+network, IPC, and storage events, ensuring cluster-wide extensibility
+without sacrificing local bare-metal throughput.
 
 \section{The Asynchronous Driver Burden and Unified Purity}
 \label{sec:io_purity}
 
-A foundational design constraint of the Telix Framekernel is that execution threads must never block on I/O. This "purity" of asynchronous design is highly consequential: it enables the M:N scheduler to pack thousands of I/O-bound tasks onto a handful of physical CPU cores without exhausting kernel stack memory.
+A foundational design constraint of the Telix Framekernel is that
+execution threads must never block on I/O. This "purity" of asynchronous
+design is highly consequential: it enables the M:N scheduler to pack
+thousands of I/O-bound tasks onto a handful of physical CPU cores
+without exhausting kernel stack memory.
 
-Consequently, all peripheral drivers, filesystem layers, and network stacks are implemented as stackless Rust \texttt{Future} state machines.
+Consequently, all peripheral drivers, filesystem layers, and network
+stacks are implemented as stackless Rust \texttt{Future} state machines.
 \begin{description}
     \item[\textbf{The Programming Burden:}] Writing drivers as continuations rather than traditional sequential threads imposes a steeper cognitive burden. Driver logic must be explicitly broken into state transitions yielding to the executor while waiting for hardware DMA or network packets.
     \item[\textbf{Unified Notification:}] The strict async requirement yields a massive architectural benefit: a single unified event notification mechanism. A continuation suspended on a network socket, a filesystem read, or a cluster-routed IPC message is awakened through the exact same Port Set capability queue.
@@ -19,7 +35,10 @@ Consequently, all peripheral drivers, filesystem layers, and network stacks are 
 \section{Bimodal Transport: Ports, Port Sets, and Rings}
 \label{sec:bimodal_transport}
 
-To maintain the network transparency of distributed capability routing while supporting zero-copy bulk data, Telix capability channels operate bimodally. The **Port** is the fundamental routing primitive, addressable across local NUMA nodes and remote cluster networks alike.
+To maintain the network transparency of distributed capability routing
+while supporting zero-copy bulk data, Telix capability channels operate
+bimodally. The **Port** is the fundamental routing primitive,
+addressable across local NUMA nodes and remote cluster networks alike.
 
 \emph{Bimodal} names the two transport \emph{mechanisms} (Immediate and
 Ring-Bound) described below.  These are orthogonal to the four IPC
@@ -29,30 +48,49 @@ mechanism, according to whether its traffic is small control messages or
 bulk data.
 
 \subsection{Immediate Mode (Fast-Path IPC)}
-For control-plane operations, small IPC messages, and intra-domain kernel interactions, traversing a ring buffer is inefficient. In Immediate Mode, sending a message to a Port transfers a small payload (typically capability tokens and minimal metadata) directly via CPU registers. If the target continuation is suspended, it is immediately migrated to the runnable queue, achieving L4-style IPC latencies.
+For control-plane operations, small IPC messages, and intra-domain
+kernel interactions, traversing a ring buffer is inefficient. In
+Immediate Mode, sending a message to a Port transfers a small payload
+(typically capability tokens and minimal metadata) directly via CPU
+registers. If the target continuation is suspended, it is immediately
+migrated to the runnable queue, achieving L4-style IPC latencies.
 
 \subsection{Ring-Bound Mode (Bulk I/O)}
-For high-bandwidth dataplane operations (e.g., NVMe block storage or 100GbE packet processing), a Capability Port is bound to a shared-memory Submission/Completion Queue (SQ/CQ). The Port itself ceases to carry payload data; instead, it acts solely as the notification "doorbell."
+For high-bandwidth dataplane operations (e.g., NVMe block storage or
+100GbE packet processing), a Capability Port is bound to a shared-memory
+Submission/Completion Queue (SQ/CQ). The Port itself ceases to carry
+payload data; instead, it acts solely as the notification "doorbell."
 
 \subsection{Port Sets as the Event Multiplexer}
-A **Port Set** allows a driver or user-space process to aggregate multiple Ports into a single waitable capability. When a continuation polls a Port Set, it can simultaneously receive fast-path cluster IPC messages and local SQ/CQ doorbell notifications, unifying distributed and local I/O seamlessly.
+A **Port Set** allows a driver or user-space process to aggregate
+multiple Ports into a single waitable capability. When a continuation
+polls a Port Set, it can simultaneously receive fast-path cluster IPC
+messages and local SQ/CQ doorbell notifications, unifying distributed
+and local I/O seamlessly.
 
 \section{Lock-Free Ring Buffer Mechanics (SQ/CQ)}
 \label{sec:ring_mechanics}
 
-When a Port is operating in Ring-Bound mode, bulk asynchronous requests communicate through a dual-ring memory structure mapped directly between the client domain and the driver \footcite{axboe19iouring}.
+When a Port is operating in Ring-Bound mode, bulk asynchronous requests
+communicate through a dual-ring memory structure mapped directly between
+the client domain and the driver \footcite{axboe19iouring}.
 
-To avoid cache-line bouncing, the queues are strictly divided into single-producer, single-consumer (SPSC) arrays:
+To avoid cache-line bouncing, the queues are strictly divided into
+single-producer, single-consumer (SPSC) arrays:
 \begin{itemize}
     \item \textbf{Submission Queue (SQ):} The client writes I/O descriptors into the ring and advances \texttt{sq\_tail} (publishing via a C11 \texttt{Release} barrier). The driver reads from \texttt{sq\_head}.
     \item \textbf{Completion Queue (CQ):} Upon concluding an operation (or processing a hardware interrupt), the driver writes a completion result and advances \texttt{cq\_tail}.
 \end{itemize}
-Because index synchronization relies on explicit atomic memory order barriers rather than mutexes, both producer and consumer can operate fully lock-free.
+Because index synchronization relies on explicit atomic memory order
+barriers rather than mutexes, both producer and consumer can operate
+fully lock-free.
 
 \section{Zero-Copy Payloads via Morsel Tokens}
 \label{sec:zerocopy_morsels}
 
-Passing large payloads across isolation boundaries typically requires costly memory copies. Telix avoids this by passing **Capability Morsel Tokens** inside the SQ/CQ descriptors rather than raw virtual addresses.
+Passing large payloads across isolation boundaries typically requires
+costly memory copies. Telix avoids this by passing **Capability Morsel
+Tokens** inside the SQ/CQ descriptors rather than raw virtual addresses.
 
 A Capability Morsel Token wraps a physical morsel --- a contiguous,
 power-of-two-aligned extent from the coremapless allocator
@@ -60,14 +98,23 @@ power-of-two-aligned extent from the coremapless allocator
 transfer).  The token is what gets passed over a Port; the underlying
 physical morsel is what the IOMMU maps.
 
-An SQ/CQ entry encodes a capability offset and length descriptor bound to a pre-shared physical memory region. The driver domain verifies that the request bounds fall strictly within the associated Capability Token. This allows the driver to process the payload directly within the shared physical frame without gaining arbitrary access to the client's broader address space.
+An SQ/CQ entry encodes a capability offset and length descriptor bound
+to a pre-shared physical memory region. The driver domain verifies that
+the request bounds fall strictly within the associated Capability Token.
+This allows the driver to process the payload directly within the shared
+physical frame without gaining arbitrary access to the client's broader
+address space.
 
 \section{DMA Safety Boundaries and IOMMU Isolation}
 \label{sec:dma_safety}
 
-Direct Memory Access (DMA) devices pose a severe threat to microkernel capability boundaries. A compromised PCIe device can issue DMA writes to arbitrary physical addresses, bypassing OS software protections.
+Direct Memory Access (DMA) devices pose a severe threat to microkernel
+capability boundaries. A compromised PCIe device can issue DMA writes to
+arbitrary physical addresses, bypassing OS software protections.
 
-Telix enforces **Capability-Bound DMA Isolation** by integrating memory morsel capabilities with hardware IOMMUs (Intel VT-d, ARM SMMU, RISC-V IOPMP) \footcite{willmann06iommu}.
+Telix enforces **Capability-Bound DMA Isolation** by integrating memory
+morsel capabilities with hardware IOMMUs (Intel VT-d, ARM SMMU, RISC-V
+IOPMP) \footcite{willmann06iommu}.
 
 \begin{itemize}
     \item \textbf{Pinned Physical Pools:} Memory allocated for DMA is designated as a pinned I/O Morsel. The Framekernel locks these physical frames and inserts mappings into the hardware IOMMU table specific to that device's PCIe domain.
@@ -77,6 +124,13 @@ Telix enforces **Capability-Bound DMA Isolation** by integrating memory morsel c
 \section{Beyond Block I/O: Filesystems and Storage}
 \label{sec:io_filesystems}
 
-While the mechanisms described in this chapter govern the efficient transport of raw blocks, packets, and IPC messages, they do not dictate the structural semantics of hierarchical storage.
+While the mechanisms described in this chapter govern the efficient
+transport of raw blocks, packets, and IPC messages, they do not dictate
+the structural semantics of hierarchical storage.
 
-Translating raw block I/O into a distributed, capability-indexed namespace requires conflict-free replicated data types (CRDTs), lease-based mutation, and robust distributed caching logic. The architecture of the Telix Distributed Filesystem and its integration with the unified Port Set notification model is detailed extensively in Chapter~\ref{ch:filesystem}.
+Translating raw block I/O into a distributed, capability-indexed
+namespace requires conflict-free replicated data types (CRDTs),
+lease-based mutation, and robust distributed caching logic. The
+architecture of the Telix Distributed Filesystem and its integration
+with the unified Port Set notification model is detailed extensively in
+Chapter~\ref{ch:filesystem}.

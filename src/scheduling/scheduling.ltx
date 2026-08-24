@@ -1,9 +1,18 @@
 \chapter{Scheduling and Execution Dispatch}
 \label{ch:scheduling}
 
-Operating system schedulers in modern high-performance environments face a multi-dimensional challenge: balancing sub-millisecond latency guarantees for real-time task continuations with strict fair-share resource allocation across throughput-bound workloads.
+Operating system schedulers in modern high-performance environments face
+a multi-dimensional challenge: balancing sub-millisecond latency
+guarantees for real-time task continuations with strict fair-share
+resource allocation across throughput-bound workloads.
 
-Telix addresses this by decoupling user-level execution contexts from physical hardware dispatch using an **M:N continuation executor model**, enforcing **Hierarchical Fair-Share allocation** via an **Earliest Eligible Virtual Deadline First (EEVDF)** engine \footcite{stoica96eevdf, zijlstra23eevdf}, and coordinating cross-partition parallelism through **gang and symbiotic coscheduling** \footcite{ousterhout82gang}.
+Telix addresses this by decoupling user-level execution contexts from
+physical hardware dispatch using an **M:N continuation executor model**,
+enforcing **Hierarchical Fair-Share allocation** via an **Earliest
+Eligible Virtual Deadline First (EEVDF)** engine
+\footcite{stoica96eevdf, zijlstra23eevdf}, and coordinating
+cross-partition parallelism through **gang and symbiotic coscheduling**
+\footcite{ousterhout82gang}.
 
 \section{Two Execution Domains}
 \label{sec:two_domains}
@@ -99,12 +108,28 @@ the M:N continuation model and the EEVDF scheduler.
 \section{Execution Model: M:N Threading via Async Continuations}
 \label{sec:mn_threading}
 
-Traditional kernel thread models rely on 1:1 mapping, where every user-space thread maps directly to a kernel task with its own preallocated kernel stack (typically 8--16~KiB). In high-concurrency environments with tens of thousands of tasks, 1:1 models cause severe memory footprint bloat and frequent hardware context-switch overhead.
+Traditional kernel thread models rely on 1:1 mapping, where every
+user-space thread maps directly to a kernel task with its own
+preallocated kernel stack (typically 8--16~KiB). In high-concurrency
+environments with tens of thousands of tasks, 1:1 models cause severe
+memory footprint bloat and frequent hardware context-switch overhead.
 
-Conversely, legacy user-level M:N threading models (mapping $M$ user threads onto $N$ kernel OS threads) suffered from severe kernel-blindness: if one user thread triggered a blocking system call or page fault, the underlying kernel thread blocked, stalling the remaining $M-1$ user threads bound to that executor \footcite{ande92}.
+Conversely, legacy user-level M:N threading models (mapping $M$ user
+threads onto $N$ kernel OS threads) suffered from severe
+kernel-blindness: if one user thread triggered a blocking system call or
+page fault, the underlying kernel thread blocked, stalling the remaining
+$M-1$ user threads bound to that executor \footcite{ande92}.
 
 \subsection{The Telix M:N Continuation Model}
-Telix's M:N executor combines three well-understood, published mechanisms — io\_uring-style async submission rings, memory-mapped completion queues, and EEVDF per-core scheduling — into a coherent two-execution-domain architecture.  None of these mechanisms is novel; the contribution is their integration into a unified framekernel design alongside the virtual-memory innovations that are the system's primary research contribution.  The three classic scheduler-activation failure modes identified by Anderson et al.~\footcite{ande91,ande92} are avoided by design, as detailed in \S\ref{sec:anderson_failure_modes} below.
+Telix's M:N executor combines three well-understood, published
+mechanisms — io\_uring-style async submission rings, memory-mapped
+completion queues, and EEVDF per-core scheduling — into a coherent
+two-execution-domain architecture.  None of these mechanisms is novel;
+the contribution is their integration into a unified framekernel design
+alongside the virtual-memory innovations that are the system's primary
+research contribution.  The three classic scheduler-activation failure
+modes identified by Anderson et al.~\footcite{ande91,ande92} are avoided
+by design, as detailed in \S\ref{sec:anderson_failure_modes} below.
 
 The components:
 
@@ -175,7 +200,9 @@ model was not wrong — it was premature.  Anderson et al.
 with kernel cooperation) but lacked the mechanisms that make it
 implementable without the fragile upcall machinery that sank
 first-generation M:N kernels.  Io\_uring-style submission rings were
-not described until Soares \& Stumm's FlexSC (2010)~\footcite{soar10} and later popularised by Axboe's io\_uring (2019)~\footcite{axbo19}; memory-mapped completion rings are
+not described until Soares \& Stumm's FlexSC (2010)~\footcite{soar10}
+and later popularised by Axboe's io\_uring (2019)~\footcite{axbo19};
+memory-mapped completion rings are
 infeasible without wide cache-coherent memory hierarchies; stackless
 futures require a language-level async abstraction that did not exist
 in C.  The abandonment of M:N in kernels was historically correct given
@@ -259,11 +286,18 @@ it.
 \section{Hierarchical Fair-Share Allocation}
 \label{sec:fair_share}
 
-To support multi-tenant isolation, containerization, and privilege domain separation, Telix organizes execution entities into a **Hierarchical Scheduling Tree**. Resource weights are distributed proportionally from root system nodes down to individual execution tasks.
+To support multi-tenant isolation, containerization, and privilege
+domain separation, Telix organizes execution entities into a
+**Hierarchical Scheduling Tree**. Resource weights are distributed
+proportionally from root system nodes down to individual execution
+tasks.
 
 \subsection{Proportional Weight Distribution}
 
-Let each node $k$ in the scheduling hierarchy be assigned a relative weight $w_k > 0$. The share of physical CPU bandwidth $S_i$ allocated to a leaf task $i$ descending from a tree path $(r, \dots, p, i)$ is calculated as the product of proportional shares along its branch:
+Let each node $k$ in the scheduling hierarchy be assigned a relative
+weight $w_k > 0$. The share of physical CPU bandwidth $S_i$ allocated to
+a leaf task $i$ descending from a tree path $(r, \dots, p, i)$ is
+calculated as the product of proportional shares along its branch:
 
 \begin{equation}
     S_i = \prod_{k \in \textrm{Ancestors}(i)} \frac{w_k}{\sum_{j \in \textrm{Siblings}(k)} w_j}
@@ -278,7 +312,12 @@ This tree structure ensures that:
 \section{Earliest Eligible Virtual Deadline First (EEVDF) Engine}
 \label{sec:eevdf_engine}
 
-At the core node level, Telix implements EEVDF to enforce both fair-share proportional service and strict latency bounds. Unlike completely fair schedulers (CFS) that optimize solely for accumulated virtual runtime ($v_i$), EEVDF explicitly calculates both **eligibility** (fairness) and **virtual deadlines** (latency sensitivity).
+At the core node level, Telix implements EEVDF to enforce both
+fair-share proportional service and strict latency bounds. Unlike
+completely fair schedulers (CFS) that optimize solely for accumulated
+virtual runtime ($v_i$), EEVDF explicitly calculates both
+**eligibility** (fairness) and **virtual deadlines** (latency
+sensitivity).
 
 \subsection{Virtual Time and Lag Accounting}
 
@@ -320,7 +359,9 @@ rendered defines the future's \textbf{lag} $L_i(t)$:
 
 \subsection{Eligibility and Virtual Deadline Calculation}
 
-To prevent latency-sensitive tasks with small requested execution quantums ($q_i$) from being starved by compute-bound workloads, EEVDF divides dispatch evaluation into two phases:
+To prevent latency-sensitive tasks with small requested execution
+quantums ($q_i$) from being starved by compute-bound workloads, EEVDF
+divides dispatch evaluation into two phases:
 
 \begin{enumerate}
     \item \textbf{Eligibility Criterion:} A future $i$ on executor $e$ is eligible to be polled at virtual time $V_e(t)$ if and only if its virtual time does not exceed $V_e(t)$:
@@ -358,11 +399,17 @@ per executor, sorted by $d_i$. Execution consists of invoking
 \section{Partitioned and Gang Coscheduling}
 \label{sec:coscheduling}
 
-While EEVDF provides optimal single-core thread fairness, inter-partition workloads (such as distributed capability channels or parallel workloads across multikernel nodes) suffer severe latency degradation if communicating processes are not scheduled simultaneously.
+While EEVDF provides optimal single-core thread fairness,
+inter-partition workloads (such as distributed capability channels or
+parallel workloads across multikernel nodes) suffer severe latency
+degradation if communicating processes are not scheduled simultaneously.
 
 \subsection{Cross-Partition IPC Bottlenecks}
 
-If Partition 0 transmits an asynchronous message over a ring buffer to Partition 1, but Partition 1's local core is executing an unrelated background task, the message sits unconsumed in memory, resulting in severe cascade blocking.
+If Partition 0 transmits an asynchronous message over a ring buffer to
+Partition 1, but Partition 1's local core is executing an unrelated
+background task, the message sits unconsumed in memory, resulting in
+severe cascade blocking.
 
 \begin{figure}[h]
 \centering
@@ -389,7 +436,8 @@ If Partition 0 transmits an asynchronous message over a ring buffer to Partition
 
 \subsection{Gang and Symbiotic Coscheduling Strategy}
 
-To prevent IPC boundary stalls across multikernel partitions, Telix enforces **Matrix Gang Coscheduling**:
+To prevent IPC boundary stalls across multikernel partitions, Telix
+enforces **Matrix Gang Coscheduling**:
 
 \begin{description}
     \item[\textbf{Coordinated Time Slicing:}] Multikernel partitions share a synchronized hardware timer grid. High-bandwidth communication paths register a "gang capability" requirement to lock synchronous execution windows across partition boundaries.
