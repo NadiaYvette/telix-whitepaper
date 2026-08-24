@@ -45,26 +45,69 @@ preemption signals—allowing thread schedulers to react instantly without
 rebuilding general stack continuations.
 
 \section{Linux Personality}
-There may not be much to say here besides it being important
-economically. If what there is to say is economic, the economic argument
-should likely be made. This would be to act as a drop-in replacement for
-Linux within embedded space and server space?
+\label{sec:linux_eco}
+
+The Linux personality is the most economically significant of the
+personality servers: Linux dominates both the embedded and server
+markets, and a verified kernel that runs unmodified Linux ELF binaries
+is a drop-in replacement for the largest deployed ecosystem in
+computing.  The personality server translates POSIX system calls
+(\S\ref{sec:linux_personality}) into native Telix capability
+operations, with memory-management calls routed through the external
+pager (\S\ref{sec:fs_vm_decoupling}).
+
+The technical challenge is not ABI translation — the Linux system-call
+interface is well-documented — but matching the performance and
+semantic expectations of software written for a monolithic kernel.
+Two areas require care: \texttt{epoll} and \texttt{io\_uring}
+semantics, which map naturally to Telix's continuation-polling model,
+and \texttt{fork}/\texttt{COW}, which must be handled by the external
+pager rather than in-kernel virtual-memory code.
 
 \section{Windows Personality}
-WINE can basically be run as a server. This is probably to act as a
-drop-in replacement for the Western Linux desktop.
+\label{sec:windows_eco}
+
+The Windows NT personality server (\S\ref{sec:windows_personality})
+runs unmodified PE binaries by mapping the Windows Native API
+(\texttt{Nt*}/\texttt{Zw*} routines) onto Telix capabilities.
+In practice, this personality subsumes the role of WINE: rather than
+running WINE as a userspace translation layer atop Linux, the Windows
+personality server runs directly on Telix's native capability
+transport, eliminating a layer of indirection.  The economic
+motivation is the Western desktop market, where Windows binary
+compatibility is a prerequisite for adoption.
 
 \section{\OpenHarmony\ Personality}
-While economic, \OpenHarmony\ also has notable technology. The potential
-for gain may be limited barring the ability to interoperate at a peer
-level. It's unclear whether the limitations would be mechanistic or
-policy-driven, where only the former would be tractable.
+\label{sec:openharmony_eco}
+
+\OpenHarmony\ is both an economic target (the dominant operating system
+for the Chinese IoT and consumer-electronics ecosystem) and a technical
+peer: its distributed soft bus, component framework, and Binder-based
+IPC are architecturally closer to Telix's capability model than to
+Linux's file-descriptor interface.  The personality server emulates
+Binder IPC using lock-free shared-memory rings
+(\S\ref{sec:nextgen_abis}).
+
+The principal question is whether \OpenHarmony's distributed-device
+features can interoperate at a peer level with Telix's clustering
+layer, or whether interoperability is limited by policy decisions in
+the \OpenHarmony\ component framework rather than by mechanism.  If
+the limitation is mechanistic, Telix's transport layer can bridge it;
+if it is policy-driven (e.g., device attestation, vendor lock-in), the
+personality server provides ABI compatibility but not ecosystem
+integration.
 
 \section{Zircon Personality}
-This might be an economic reach toward the Google ecosystem, though
-there are questions about how broadly Fuchsia, whose kernel Zircon is,
-is being deployed. There are similar questions about exclusion from
-interoperation via policy as \OpenHarmony.
+\label{sec:zircon_eco}
+
+The Zircon personality targets the Google/Fuchsia ecosystem.  Zircon's
+handle-and-channel model is structurally isomorphic to Telix's
+capability model, giving near 1:1 syscall translation efficiency
+(\S\ref{sec:nextgen_abis}).  The economic question is deployment
+breadth: Fuchsia is not yet widely deployed outside Google's own
+devices, limiting the immediate practical value of this personality.
+It is included for completeness and because the translation cost is
+negligible — the isomorphism means the personality server is thin.
 
 % =========================================================================
 % ADDITIVE SECTION: To be appended to src/personality/personality.ltx
