@@ -21,8 +21,18 @@ reviewer would raise, followed by what it would take to answer it.
   five actually-novel claims are now in the whitepaper.
   Severity: High → Low (remaining gap: whether the five claims hold
   under expert review).
+- **#2 (no empirical validation): Decided.** Correctness is the
+  verification track's domain; empirical validation is about
+  performance.  Three tiers: inherited (cite prior work), page
+  clustering (Telix's core performance hypothesis), compositional
+  (the combination burden).  Whitepaper relabelled the distribution
+  argument "Predicted (Hypothesis)" (commit `ecb0929`, `460e3cb`).
+- **#3 (verification-implementation gap): Decided.** Full framekernel
+  core, manual Iris heap\_lang (not RefinedRust), assembly specs
+  specialised from Sail, layer-by-layer delivery (commit `d8ed2e4`).
+  The remaining work is engineering, not research.
 
-**Open count: 8 of 10 remain.**
+**Open count: 6 of 10 remain** (#1, #4, #5, #7, #9, #10).
 
 ---
 
@@ -291,30 +301,9 @@ then "the same technique applied to more functions."
 This decision is about reviewer psychology, not engineering: nobody
 doubts that the hardware proofs are real; everyone doubts that the
 kernel side is tractable.  One closed function is worth a thousand
-"RefinedRust could be applied."
-
-#### 3d. What the author must decide
-
-1. **Scope of verified kernel.**  Is the target the full framekernel
-   core, or a named subset (e.g., "page-table manipulation, IPI, and
-   IOMMU paths only; not the LLFree allocator, not the scheduler")?
-
-2. **Existence-proof milestone.**  Will the first publication contain
-   at least one end-to-end function proved against the machine
-   interface, or will B1 (the Iris resource definitions) be the first
-   deliverable, with B3 to follow?
-
-3. **RefinedRust vs. manual Iris.**  If RefinedRust's MIR→Coq pipeline
-   proves insufficient for bare-metal code, is the fallback to write
-   the kernel spec *manually* in Iris heap_lang (as seL4 did in
-   Isabelle) rather than derive it from Rust MIR?  This is slower but
-   well-understood, and it eliminates the toolchain risk.
-
-4. **Assembly specification.**  Who writes the trusted specification
-   of privileged instructions, and how is it validated against the
-   Sail model?  The Sail model *generates* an executable semantics;
-   ideally the assembly spec is a *specialisation* of that semantics,
-   not a separate, unaudited axiomatisation.
+"RefinedRust could be applied."  The author's decision to proceed
+function-by-function (3c, item 4) absorbs this concern: the first
+`unmap_range` proof is precisely that existence proof.
 
 ## 4. Stackless-futures-everywhere is an extreme position
 
@@ -446,18 +435,24 @@ hardware, not on Rust alone.
 
 ## Summary of priority
 
-| # | Vulnerability | Severity | Fix difficulty |
-|---|--------------|----------|----------------|
-| 6 | No threat model | High | Low (write it) |
-| 8 | No comparisons | High | Low (write it) |
-| 2 | No empirical validation | High | Medium (commit to a plan) |
-| 1 | Framekernel boundary asserted | High | High (needs evidence) |
-| 3 | Verification-implementation gap | High | High (needs a proof) |
-| 4 | Stackless-futures extreme | Medium | Medium (name the mechanism) |
-| 10 | Rust-for-isolation unexamined | Medium | Medium (bound `unsafe`) |
-| 9 | M:N revival burden | Medium | Medium (address failure modes) |
-| 5 | Clustering guarantee narrow | Medium | Low (rescore) |
-| 7 | Cluster story thin | Medium | Medium (failure model) |
+| # | Vulnerability | Severity | Status |
+|---|--------------|----------|--------|
+| 1 | Framekernel boundary asserted | High | **Open** (paired with #10) |
+| 4 | Stackless-futures extreme | Medium | **Open** (paired with #9) |
+| 5 | Clustering guarantee narrow | Medium | **Open** |
+| 7 | Cluster story thin | Medium | **Open** |
+| 9 | M:N revival burden | Medium | **Open** (paired with #4) |
+| 10 | Rust-for-isolation unexamined | Medium | **Open** (paired with #1) |
+| 2 | No empirical validation | — | **Decided** (correctness=verification, performance=empirical) |
+| 3 | Verification-implementation gap | — | **Decided** (manual Iris, full core, Sail-specialised) |
+| 6 | No threat model | — | **Addressed** (ch:security) |
+| 8 | No comparisons | — | **Addressed** (ch:comparison) |
 
-Items 6 and 8 are addressed by the two chapters added alongside this
-document; the rest remain open and are candidates for author response.
+The six open items form three natural clusters:
+
+- **#1 + #10** — the isolation story: can the framekernel boundary be
+  defended, and is Rust-alone isolation conditional on proof/CHERI?
+- **#4 + #9** — the execution model: can stackless futures carry the
+  scheduler-activation revival, and is migration serializable?
+- **#5 + #7** — the two "narrow but real" items: scope the clustering
+  guarantee, and give the cluster story a failure model.
