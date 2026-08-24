@@ -147,10 +147,10 @@ Telix explicitly relies on specialized ISA features to eliminate traditional OS 
     \item[\textbf{Custom Inverted-Page-Table MMU (satp modes 14/15)}]:
     A forward-looking RISC-V extension replacing the radix-tree walker
     with a partner-hashed inverted page table, a POWER9-style segment
-    lookaside buffer, and residue-partitioned TLBs.  It spans 56
-    distinct superpage sizes down to a 256~B base page — half the
-    VAX's 512~B — while preserving large-page TLB reach through
-    \pageclustering.  The design is modelled in Sail and proved in
+    lookaside buffer, and residue-partitioned TLBs.  It spans 42
+    distinct translation sizes (41 superpage sizes above a 256~B base
+    page — half the VAX's 512~B) while preserving large-page TLB
+    reach through \pageclustering.  The design is modelled in Sail and proved in
     Rocq as part of the Tessera hardware model, with a QEMU
     simulation branch.  It is detailed in \S\ref{sec:custom_mmu} and
     is a research prototype requiring RISC-V ratification of the new

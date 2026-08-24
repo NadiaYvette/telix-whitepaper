@@ -471,16 +471,20 @@ MMU extension that replaces the hardware radix-tree walker with an
     Because there is no radix tree to walk, the full 64-bit virtual
     address space is used rather than truncating at 48 or 57 bits.
 
-  \item[\textbf{56 distinct superpage sizes.}] With a base page
+  \item[\textbf{42 distinct translation sizes.}] The 56 bits above
+    the 256~B offset are split into a 14-bit segment ID (16,384
+    segments) and a 42-bit VPN within the segment.  With a base page
     $K = 256$~B (half the VAX-11's 512~B) and a jump increment
     $W = 1$, the extension represents $g_n = K \cdot 2^{n}$ for
-    $n \in [0, 55]$, from 256~B to 8~EiB.  On a conventional radix
-    tree a 256~B page would be catastrophic (a 48-bit VA yields
-    $2^{40}$ pages and a 16-level tree).  An inverted table is sized
-    to the number of \emph{mappings}, not pages, so larger
-    translations \emph{shrink} the table.  \pageclustering\ supplies
-    the fine-granularity COW/sharing behaviour at the bottom while
-    superpages supply TLB reach at the top.
+    $n \in [0, 41]$, from 256~B to 512~TiB — 42 translation sizes in
+    all, or 41 superpage sizes strictly above the base page.  On a
+    conventional radix tree a 256~B page would be catastrophic (a
+    48-bit VA yields $2^{40}$ pages and a 16-level tree).  An
+    inverted table is sized to the number of \emph{mappings}, not
+    pages, so larger translations \emph{shrink} the table.
+    \pageclustering\ supplies the fine-granularity COW/sharing
+    behaviour at the bottom while superpages supply TLB reach at the
+    top.
 
   \item[\textbf{Partner-hashed table.}] The table uses partner
     hashing (Bender--Kuszmaul--Zhou) to run at load factor 1 with
@@ -497,11 +501,29 @@ MMU extension that replaces the hardware radix-tree walker with an
     superpage in its base-page arrays.
 
   \item[\textbf{SLB (mode 15).}] A 256-entry segment cache maps a
-    16~PiB segment (a 50-bit segment boundary chosen to exceed any
-    realistic superpage, so no single superpage crosses a segment
-    boundary) to its segment-table pointer, narrowing the inverted-table
-    probe on hit.
+    1~PiB segment — the 50-bit segment boundary implied by the
+    14-bit segment ID — to its segment-table pointer, narrowing the
+    inverted-table probe on hit.  The segment exceeds the largest
+    superpage ($2^{49}$~B), so no single superpage crosses a segment
+    boundary.
 \end{description}
+
+\medskip
+\noindent
+\textbf{No existing operating system could operate this MMU.}
+Every general-purpose operating system in wide use assumes a radix-tree
+page table and a small, fixed page-size spectrum (typically a 4~KiB
+base page plus one or two huge-page sizes, e.g. 2~MiB/1~GiB on x86).
+Their allocators, page-table walkers, TLB shootdown paths, and
+reverse-mapping structures are all specialised to that assumption.
+None of them could drive a 42-size inverted page table with a
+software-managed refill and a residue-partitioned TLB in anything
+remotely resembling its current form: the dense spectrum and inverted
+structure are usable only because Telix's morsel allocator,
+extent-based accounting, and verified refill handler are designed for
+them from the start.  This is the strongest expression of the claim
+that page clustering is not an incremental change to existing memory
+management but a different point in the design space.
 
 The extension is modelled in Sail and mechanically generated to Rocq,
 with machine-checked proofs of hash determinism, superpage-consistency,
