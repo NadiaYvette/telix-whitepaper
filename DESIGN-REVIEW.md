@@ -57,11 +57,95 @@ LLFree allocator, and the shootdown protocol are all *specified* as living
 inside the framekernel. Whether they can be moved out without redesign is
 itself unproven.
 
-**What would answer it.** Either (a) a small proof-of-concept
-demonstrating the framekernel/pager boundary in Rust under the stated
-threat model, or (b) a precise statement of which framekernel-resident
-components are load-bearing for the safe-language argument and which are
-there only for latency, with the latter demonstrated to be movable.
+This issue is paired with **#10 (Rust-for-isolation unexamined)**, which
+is the same problem from the language-safety side: the framekernel's
+`unsafe` surface is unquantified, and the isolation claim is conditional
+on either proofs or CHERI hardware.
+
+### Detailed breakdown
+
+#### 1a. What we know from prior work
+
+- **Asterinas** proved that Rust safety can enforce isolation within a
+  single kernel address space *when the whole system is in Rust and the
+  `unsafe` surface is bounded and audited.*
+- **RedLeaf** (OSDI 2020) proved that Rust safety can isolate *device
+  drivers* within one address space without per-driver MMU domains.
+- **seL4** proved that MMU-based isolation can be machine-checked
+  end-to-end for a whole kernel.
+- **RustBelt** (POPL 2018) proved that Rust's type system is sound in a
+  formal model.
+
+What prior work does *not* give us: a proof or even a demonstration that
+a *hybrid* boundary (Rust-safe inside, MMU outside) is sound in the
+hostile, interrupt-driven, `unsafe`-pervasive kernel environment.
+
+#### 1b. What the framekernel boundary actually isolates
+
+The framekernel contains these components (from the control-plane and
+security chapters):
+
+| Component | Why it's in the framekernel | Movable? |
+|-----------|----------------------------|----------|
+| Page-table manipulation | Latency-critical; every page fault touches this | Hard — every fault crosses a new MMU boundary if moved |
+| TLB shootdown / IPI | Latency-critical; runs in interrupt context | Hard — IPI delivery is inherently kernel-side |
+| IOMMU management | Binds DMA windows; must be privileged | Hard — IOMMU is a privileged hardware resource |
+| LLFree allocator | Provisions physical frames on every allocation | Medium — allocator could be a separate server with a ring protocol |
+| Scheduler management loop | Selects next future; runs in the executor | Medium — scheduler could be a separate server |
+
+The page-table/shootdown/IOMMU triad is the genuinely load-bearing part:
+these are privileged operations that the hardware gives only to the
+kernel. The LLFree allocator and scheduler are in the framekernel for
+latency, not because they must be. The degradation claim ("if the
+boundary is unsound, promote to userspace at the cost of MMU
+boundaries") is therefore only partially true: the privileged triad
+cannot be promoted; the allocator and scheduler can.
+
+#### 1c. The `unsafe` surface
+
+The Rust-for-isolation concern (#10) is the same problem from the
+other side. The framekernel's `unsafe` blocks are not yet audited or
+counted. They include:
+
+- MMIO reads/writes to device registers
+- Page-table walks that dereference raw physical addresses
+- Inline assembly (`sfence.vma`, `mret`, `csrw satp`)
+- Interrupt entry/exit (saving/restoring registers)
+- LLFree's in-band metadata within free frames
+
+Each `unsafe` block is a point where the Rust type system's guarantees
+are suspended and the programmer asserts correctness. The isolation
+claim depends on the correctness of every one of these assertions.
+
+#### 1d. What the author must decide
+
+1. **Which components are load-bearing for the privileged triad?**
+   The page-table manipulator, shootdown handler, and IOMMU manager
+   cannot be moved out of the framekernel (they are privileged
+   hardware operations). Are there any others that are similarly
+   non-negotiable, or is the list of three exhaustive?
+
+2. **Is the degradation claim scoped honestly?** The current
+   whitepaper says "if the boundary is unsound, Telix degrades
+   gracefully to a pure microkernel." But the privileged triad
+   cannot be degraded. Should the claim be narrowed to "the
+   allocator and scheduler can be promoted to servers; the
+   privileged triad stays in the kernel and its isolation is
+   hardware-enforced"?
+
+3. **What is the `unsafe` surface, quantitatively?** Has anyone
+   counted the `unsafe` blocks in the framekernel core? A number
+   (e.g., "~200 `unsafe` blocks, each auditable by hand") is far
+   more defensible than silence.
+
+4. **Is the isolation claim conditional?** The current wording
+   implies Rust safety is sufficient. A more honest formulation:
+   "The framekernel's language-level isolation is conditional on
+   either (a) RefinedRust/manual-Iris proofs of every `unsafe`
+   block, or (b) CHERI hardware enforcing the same bounds in
+   silicon. Until one of those is true, the design relies on MMU
+   isolation for the privileged triad and on Rust safety as an
+   additional, not a primary, boundary."
 
 ## 2. No empirical validation anywhere in the design
 
@@ -424,12 +508,13 @@ memory-mapped device registers and DMA, and the std-less allocator and
 interrupt model are outside the language's normal guarantees. RustBelt
 proved soundness for a *model* of Rust; it did not prove the kernel
 programmer's `unsafe` blocks are correct. The verification story
-(RefinedRust) is the only thing that would close this, and it is
+(manual Iris) is the only thing that would close this, and it is
 proposed, not done (see §3).
 
-**What would answer it.** Bound the `unsafe` surface, and state that
-isolation claims are conditional on either RefinedRust proofs or CHERI
-hardware, not on Rust alone.
+**Status: merged into #1 §1c–1d above.** The `unsafe` surface audit,
+the conditional-isolation formulation, and the privileged-triad
+analysis are the same decisions. The author's answers to #1's four
+questions determine the answer to #10 as well.
 
 ---
 
