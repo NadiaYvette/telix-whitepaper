@@ -454,12 +454,13 @@ The extent-based accounting used throughout the VM subsystem aligns
 naturally with hardware-enforced capability architectures, specifically
 \textit{CHERI} and ARM Morello.
 
-When compiled for capability hardware, Telix's software Memory Morsels
-(base, offset, length) will materialize directly as 128-bit hardware fat
-pointers. This transfers spatial memory safety enforcement from software
-checks to the CPU hardware pipeline, providing unforgeable,
-hardware-bounded memory protection for shared-memory I/O rings and
-Framekernel capability domains.
+When compiled for capability hardware, the (base, length) bounds of
+a capability morsel token are materialised as the bounds field of a
+128-bit hardware fat pointer (CHERI capability).  This transfers
+spatial memory safety enforcement from software checks to the CPU
+hardware pipeline, providing unforgeable, hardware-bounded memory
+protection for shared-memory I/O rings and Framekernel capability
+domains.
 
 \section{Framekernels, Multikernels, and Address Spaces}
 \label{sec:mem_address_spaces}

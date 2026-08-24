@@ -54,6 +54,12 @@ Because index synchronization relies on explicit atomic memory order barriers ra
 
 Passing large payloads across isolation boundaries typically requires costly memory copies. Telix avoids this by passing **Capability Morsel Tokens** inside the SQ/CQ descriptors rather than raw virtual addresses.
 
+A Capability Morsel Token wraps a physical morsel --- a contiguous,
+power-of-two-aligned extent from the coremapless allocator
+(\S\ref{sec:mem_coremapless}) --- with access rights (read, write,
+transfer).  The token is what gets passed over a Port; the underlying
+physical morsel is what the IOMMU maps.
+
 An SQ/CQ entry encodes a capability offset and length descriptor bound to a pre-shared physical memory region. The driver domain verifies that the request bounds fall strictly within the associated Capability Token. This allows the driver to process the payload directly within the shared physical frame without gaining arbitrary access to the client's broader address space.
 
 \section{DMA Safety Boundaries and IOMMU Isolation}
