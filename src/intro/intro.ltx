@@ -95,18 +95,24 @@ two decades of hardware and language evolution:
     system — kernel, drivers, filesystems, network stack — can
     be written in a safe, garbage-collected language and sealed
     into software-isolated processes without hardware MMU
-    boundaries.  Both were research prototypes that never reached
-    production; both proved the concept.  Telix extends this
-    lineage with a key difference: rather than committing the
-    whole system to one safe language, Telix's framekernel
-    selectively pulls latency-critical components into a Rust
-    address space while the rest — including filesystem servers,
-    personality emulators, and device drivers written in
-    languages as varied as Haskell, Mercury, and Koka — run as
-    conventional microkernel processes.  The
-    Frankenstein\,/\,Organ Bank polyglot compilation stack
-    (Chapter~\ref{ch:polyglot}) is the toolchain that makes this
-    heterogeneity mechanically real.
+    boundaries.  Both proved the concept; neither reached
+    production, and the lineage they began has languished since.
+    More recent attempts (Cāngjié/仓颉, Rust kernels like Redox
+    and Theseus) have reached toward parity with extant operating
+    systems but have not yet closed the gap.  Telix's contribution
+    here is both revanchist — reclaiming the Singularity/Midori
+    insight that safe languages can replace hardware isolation
+    for kernel components — and gap-filling: no prior system has
+    combined safe-language construction with formal verification
+    of the memory-management algorithms and ABI compatibility
+    sufficient to run real Linux and Windows workloads.  The
+    longer-term hope is that the selective framekernel absorption
+    model and a polyglot compilation stack
+    (Chapter~\ref{ch:polyglot}) will eventually extend this to
+    privileged system servers that are typically inlined into
+    monolithic kernels, achieving safe-language construction for
+    the whole OS stack rather than just the thin framekernel
+    core.
 \end{description}
 
 In each case, Telix's claim is not that the idea is new.  The claim is
