@@ -7,6 +7,23 @@ resolved either by defending the position in the paper or by changing the
 design. Each item is stated as the *strongest form* of the objection a
 reviewer would raise, followed by what it would take to answer it.
 
+## Changes since initial draft
+
+- **#6 (no threat model): Addressed** by the Security chapter
+  (`ch:security`, commit `f47d526`).  An adversary model, TCB
+  decomposition, isolation primitives, the degradation path, and
+  explicit side/covert-channel non-claims are now in the whitepaper.
+  Severity: High → Low (remaining gap: whether the claims table
+  survives a security reviewer's scrutiny).
+- **#8 (no comparisons): Addressed** by the Comparison chapter
+  (`ch:comparison`, commit `f47d526`).  A design-space table, seven
+  contemporary systems, "why not build on X?" answers, and a list of
+  five actually-novel claims are now in the whitepaper.
+  Severity: High → Low (remaining gap: whether the five claims hold
+  under expert review).
+
+**Open count: 8 of 10 remain.**
+
 ---
 
 ## 1. The framekernel boundary is asserted, not established
@@ -80,6 +97,147 @@ kernel sound against them.
 theorems) from the *proposed* (RefinedRust kernel proofs) more sharply,
 and commit to a first milestone that closes even one kernel function
 end-to-end (e.g., `unmap_range`) as the existence proof.
+
+### Detailed breakdown
+
+This is the highest-cost-to-close item and the one where the design
+choices are most consequential.  Here is every piece of it, stated
+concretely enough to make a decision about scope.
+
+#### 3a. What the Tessera hardware proofs actually give us
+
+The Tessera proofs are already done and machine-checked:
+
+| Theorem | File | What it proves |
+|---------|------|----------------|
+| PTE root-entry removal | `coherence.v` | Dropping a level-2 PTE faults the walk at level 2 |
+| PTE leaf-entry removal | `coherence.v` | Same for level-0; invalidation at any radix level prevents translation |
+| N-core broadcast under SC | `shootdown.v` | Sequential-consistency functional shootdown correctness |
+| N-core broadcast under gpfsl/iRC11 | `shootdown_weak_broadcast.v` | The release/acquire protocol is sufficient without sequential consistency |
+| IPI inbox model | `shootdown_weak_broadcast.v` (S2.3/S2.4) | Ghost-step correspondence: leader ack = `receive_ipi (deliver_ipi _ i)` |
+| IOMMU coherence (VT-d) | `iommu_proofs.v` | IOTLB ⊆ mapping before/after invalidation |
+| IOMMU coherence (SMMUv3) | `smmu_proofs.v` | Same for Arm SMMU with STE/CD/two-stage |
+| IOMMU coherence (AMD-Vi) | `amdvi_proofs.v` | Same for AMD DTE/PASID cache |
+| Device models (INTC, timer, UART, NIC, disk) | `intc_proofs.v`, `timer_proofs.v`, etc. | Test-vector-level properties |
+| Upstream conformance bridge | `conformance.v` | Hand-transcribed walk = upstream sail-riscv `pt_walk` |
+| Multi-arch replay | various | MIPS PageGrain 1KiB, LoongArch odd/even pairs, AArch64 block+contpte+LPA2 |
+
+What these give us: a *machine model* with *proved invariants* about
+coherence, shootdown, IOMMU integrity, and MMU conformance.  The proofs
+say "if the kernel follows this protocol (invalidate PTE → local flush →
+IPI → wait for acks → IOTLB invalidate), then coherence holds."
+
+What they do *not* give us: any statement about actual kernel code.
+The `bc_broadcast_spec` theorem is about an *abstract program* expressed
+directly in the gpfsl language, not about a Rust function.
+
+#### 3b. The pieces that need to be built
+
+The gap has four discrete parts, ordered by increasing difficulty:
+
+**B1. Machine interface Iris resources (~500–1,000 lines of Rocq).**
+Define `pte_token`, `tlb_flushed`, `iommu_mapping`, `shared_subtree` as
+Iris resources with accessor lemmas and soundness proofs against the
+generated `machine.v`.  This is the bridge: the kernel holds
+`pte_token(va, pa, perm)` iff the hardware model's radix walk from satp
+through the actual page table gives that PTE at va; the kernel has
+`tlb_flushed(va)` iff the gpfsl broadcast theorem says no core's TLB
+contains va.
+
+Status: *designed but not written*.  The verification chapter has the
+signatures; the proofs against `machine.v` are straightforward (the
+hardware invariants already exist, this is just repackaging them as Iris
+resources).  This is the "well-scoped engineering effort" — genuinely
+well-scoped, but also genuinely work (~3–4 weeks for someone fluent in
+Iris).
+
+**B2. Kernel Rust → Coq translation (~uncertain, depends on tool).**
+RefinedRust takes Rust MIR and produces a Coq representation.  It has
+been demonstrated on Rust libraries (`std::Vec`, `HashMap`, `Arc`) and on
+verified OS components (the RefinedRust paper verified parts of the
+Redox kernel's `unsafe` code).  It has *not* been demonstrated on:
+
+- Code without `std` (Telix uses `#![no_std]`)
+- Code with inline assembly (`sfence.vma`, `mret`)
+- Code with MMIO (volatile reads/writes to device registers)
+- Code using a custom allocator (LLFree instead of `std::alloc`)
+- Code in an interrupt context (entry/exit not through `fn main()`)
+
+The question: how much of RefinedRust's MIR→Coq pipeline works unchanged
+in this environment, and how much needs new frontend support?  This is
+the same category of problem as adapting RefinedRust to Redox, which the
+paper's authors have expressed interest in but not yet published.
+
+**B3. Proving the kernel satisfies the machine interface (~2,000–4,000
+lines of Rocq).**  For each framekernel core function (PTE write, TLB
+flush, IPI send, IPI receive, IOMMU map/unmap), prove an Iris triple
+that the function respects the machine interface resources.  For example:
+
+```
+Lemma wp_unmap_range (va : vaddr) :
+  {{{ pte_token va pa perm ∗ tlb_entry va }}}
+    unmap_range va
+  {{{ RET (); tlb_flushed va ∗ ¬ pte_token va pa perm }}}.
+```
+
+The proof composes the hardware theorems (`coherence_leaf` says PTE
+invalidation works; `bc_broadcast_spec` says the IPI protocol works;
+`iommu_shootdown_correct` says IOTLB invalidation works) with the
+assertion that the Rust code *actually does those operations in the right
+order*.  This is the part that is the kernel verification; it is
+substantial but bounded (the framekernel core is ~3,000–5,000 lines of
+Rust, and not all of it is protocol-relevant).
+
+**B4. Assembly and MMIO soundness (~500 lines of Rocq).** Define axioms
+or specifications for the privileged instructions and MMIO operations the
+kernel uses: `sfence.vma`, `mret`, `csrw satp`, interrupt entry/exit,
+volatile device reads/writes.  These are the primitives B3's proofs
+"bottom out" on.  They cannot be proven in the same sense that pure Rust
+code can (they are hardware operations), but they must be *specified*
+with a semantics consistent with the Sail machine model, and their
+specifications become the axioms of the kernel proof.
+
+This is the same problem seL4 faced with its ARM/x86 assembly
+specifications, and the same solution applies: write a trusted
+specification ("this assembly sequence does X to the machine state"),
+prove everything else, and audit the specification by hand.
+
+#### 3c. The existence proof as a decision point
+
+The current whitepaper proposes verifying the *entire* framekernel core
+(3,000–5,000 lines).  An alternative, which a reviewer would find more
+credible, is to declare a **minimum viable verification milestone** — one
+end-to-end function, say `unmap_range` or `shootdown_broadcast` —
+and make that the existence proof that the stack works.  The rest is
+then "the same technique applied to more functions."
+
+This decision is about reviewer psychology, not engineering: nobody
+doubts that the hardware proofs are real; everyone doubts that the
+kernel side is tractable.  One closed function is worth a thousand
+"RefinedRust could be applied."
+
+#### 3d. What the author must decide
+
+1. **Scope of verified kernel.**  Is the target the full framekernel
+   core, or a named subset (e.g., "page-table manipulation, IPI, and
+   IOMMU paths only; not the LLFree allocator, not the scheduler")?
+
+2. **Existence-proof milestone.**  Will the first publication contain
+   at least one end-to-end function proved against the machine
+   interface, or will B1 (the Iris resource definitions) be the first
+   deliverable, with B3 to follow?
+
+3. **RefinedRust vs. manual Iris.**  If RefinedRust's MIR→Coq pipeline
+   proves insufficient for bare-metal code, is the fallback to write
+   the kernel spec *manually* in Iris heap_lang (as seL4 did in
+   Isabelle) rather than derive it from Rust MIR?  This is slower but
+   well-understood, and it eliminates the toolchain risk.
+
+4. **Assembly specification.**  Who writes the trusted specification
+   of privileged instructions, and how is it validated against the
+   Sail model?  The Sail model *generates* an executable semantics;
+   ideally the assembly spec is a *specialisation* of that semantics,
+   not a separate, unaudited axiomatisation.
 
 ## 4. Stackless-futures-everywhere is an extreme position
 
