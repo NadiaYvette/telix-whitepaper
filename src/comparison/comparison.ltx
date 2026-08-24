@@ -1,0 +1,206 @@
+\chapter{Comparison with Contemporary Systems}
+\label{ch:comparison}
+
+Telix occupies a specific point in a design space already populated by
+mature systems.  This chapter locates Telix relative to them, and states
+plainly what is borrowed, what is new, and why the new parts are not
+already provided by a configuration of an existing system.
+
+\section{The Design Space}
+\label{sec:design_space}
+
+Two axes organise the space.  The first is the \emph{isolation
+mechanism}: hardware MMU boundaries (classic microkernels) versus
+language-enforced safety (safe-language kernels).  The second is the
+\emph{memory-management stance}: conventional per-page descriptor
+arrays versus extent-based (morsel) accounting.
+
+\begin{table}[h]
+\centering
+\caption{Contemporary systems and the design point Telix occupies.}
+\label{tab:comparison}
+\begin{tabularx}{\textwidth}{l l X X}
+\toprule
+\textbf{System} & \textbf{Isolation} & \textbf{Memory stance} & \textbf{Distinctive contribution} \\
+\midrule
+seL4 \footcite{klei09}
+  & MMU & per-page & Verified kernel; cap-based IPC \\
+\midrule
+Zircon/Fuchsia \footcite{fuchsia_zircon}
+  & MMU & per-page & Production microkernel; handles+channels \\
+\midrule
+Redox \footcite{redox}
+  & MMU + Rust & per-page & Rust microkernel, POSIX personality \\
+\midrule
+Theseus \footcite{theseus20}
+  & Rust (cell-based) & per-page & Rust state management, live evolution \\
+\midrule
+RedLeaf \footcite{redleaf20}
+  & Rust (type-based) & per-page & Safe Rust device drivers, no MMU per-driver \\
+\midrule
+Asterinas \footcite{peng24}
+  & Rust (framekernel) & per-page & Whole OS in one Rust-safe address space \\
+\midrule
+Singularity \footcite{hunt07singularity}
+  & Language (Sing\#) & per-page & Safe-language OS, SIPs, sealed processes \\
+\midrule
+\textbf{Telix}
+  & MMU + Rust (hybrid) & \textbf{morsel/extent} & Extent memory + external pagers + CPS + cluster \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Why Not Build on seL4?}
+\label{sec:vs_sel4}
+
+seL4 \footcite{klei09} is the reference point: a microkernel whose
+correctness is machine-checked end to end.  If the goal were ``a
+verified kernel,'' seL4 already exists and has done for over a decade.
+
+Telix differs in three ways that are not incremental:
+
+\begin{enumerate}
+  \item \textbf{Memory model.} seL4 verifies a kernel whose page
+    allocation is conventional; it does not provide page clustering,
+    morsel accounting, or the sublinear-metadata goal, which are
+    properties of the \emph{memory manager}, not the kernel's
+    correctness.  Telix's memory design is orthogonal to, and could in
+    principle be layered atop, seL4's verified core --- but seL4 does
+    not provide it today.
+
+  \item \textbf{Verification style.} seL4's proof is a heroic,
+    single-implementation, per-ISA effort.  Telix's stated approach is
+    compositional: hardware proofs (Tessera) independent of the kernel,
+    then a machine-interface Iris layer, then RefinedRust.  Whether this
+    is \emph{easier} than the seL4 path is unproven; the claim is only
+    that it is a different decomposition.
+
+  \item \textbf{Scope.} seL4 is a kernel, not an OS; its userspace story
+    (pagers, personalities, filesystems) is deliberately out of scope.
+    Telix is a design \emph{for the whole system}, including the
+    external pager and personality layers that seL4 leaves to its users.
+\end{enumerate}
+
+The honest comparison: Telix does not compete with seL4 on ``verified
+kernel'' --- seL4 wins there and is real.  Telix competes on the
+\emph{memory-management and scheduling} design layered above the
+kernel boundary, where seL4 is silent.
+
+\section{Why Not Build on Zircon?}
+\label{sec:vs_zircon}
+
+Zircon \footcite{fuchsia_zircon} is the production-proven microkernel
+with the capability model (handles and channels) closest to Telix's.
+The structural isomorphism is close enough that the personality chapter
+(\S\ref{sec:nextgen_abis}) claims Zircon syscalls translate ``near 1:1''
+to Telix capabilities.
+
+Where Telix diverges:
+
+\begin{itemize}
+  \item Zircon retains conventional per-page memory accounting and a
+    conventional kernel thread model.  Telix's morsel allocator,
+    external pagers, and M:N stackless futures are not present in
+    Zircon, and are not straightforwardly addable without reworking its
+    core.
+
+  \item Zircon is tightly coupled to Fuchsia's component framework
+    (FIDL, components, packages).  Telix's personality model is
+    deliberately ABI-agnostic (Linux, Windows, Zircon, OpenHarmony),
+    treating Zircon as \emph{one} personality among several rather than
+    the native substrate.
+\end{itemize}
+
+\section{Why Not Build on Redox or Theseus?}
+\label{sec:vs_rust}
+
+Redox \footcite{redox} and Theseus \footcite{theseus20} are the two
+prominent Rust kernels, and the natural first question is ``why is this
+not an incremental change to one of them?''
+
+\begin{description}
+  \item[\textbf{Redox}] is a microkernel with a POSIX personality,
+    built for memory safety in Rust.  It is the closest existing
+    implementation to Telix's \emph{personality} ambition.  It does not
+    provide page clustering, morsel accounting, external pagers, M:N
+    stackless futures, or the cluster/SSI model.  Telix's contributions
+    are at the memory-management and scheduling layer, not the
+    ``write a kernel in Rust'' layer, so Redox is a compatibility
+    \emph{peer} rather than a superset.
+
+  \item[\textbf{Theseus}] explores language-level state management
+    (cell-based composition, live evolution) rather than memory
+    granularity.  Its isolation is Rust-based throughout; it does not
+    attempt the hybrid MMU/language boundary Telix proposes, and its
+    memory model is conventional.  Theseus's contribution --- that safe
+    languages enable OS restructuring --- is a premise Telix shares but
+    applies to a different subsystem.
+\end{description}
+
+RedLeaf \footcite{redleaf20} is the most instructive neighbour: it
+demonstrated that Rust's type system can isolate device drivers inside
+one address space without per-driver MMU domains.  That result is the
+closest published evidence for Telix's aspirational framekernel
+boundary (\S\ref{sec:aspirational}) --- and it also marks the boundary
+of what is known: RedLeaf isolated \emph{drivers}, not the full set of
+mutually-distrusting servers Telix proposes to co-locate.
+
+\section{The Asterinas Relationship}
+\label{sec:vs_asterinas}
+
+Asterinas \footcite{peng24} made the framekernel idea concrete: a whole
+OS in one Rust-safe address space, with no MMU isolation between
+servers, and no performance-costly context switches.  Telix borrows the
+framekernel technique but stops far short of Asterinas' maximalism:
+
+\begin{itemize}
+  \item Asterinas puts \emph{everything} in one address space; Telix
+    pulls in only thin, performance-critical layers and leaves the rest
+    as isolated processes.
+
+  \item Asterinas' isolation argument is uniform (Rust everywhere);
+    Telix's is heterogeneous (Rust inside, MMU outside), which is both
+    the source of its flexibility and its least-proven aspect
+    (\S\ref{sec:aspirational}).
+\end{itemize}
+
+The relationship is best described as: Telix is a multikernel
+(\Barrelfish) of \emph{partial} framekernels (\Asterinas), where the
+framekernel is an optimisation layer rather than the whole TCB.
+
+\section{What Is Actually New}
+\label{sec:what_is_new}
+
+Stripping away the borrowed parts leaves a short, defensible list of
+novel claims:
+
+\begin{enumerate}
+  \item \textbf{Morsel/extent-based coremapless memory} as the
+    \emph{primary} accounting unit (borrowed from main-memory databases
+    \footcite{kemp14}, applied kernel-wide), with the Z-granularity
+    no-external-fragmentation guarantee (\S\ref{sec:mem_clustering}).
+
+  \item \textbf{The Z-attractor distributional argument} for TLB reach
+    --- that clustering's main effect is to raise the \emph{mean}
+    translation size by herding the left tail, not to produce a few
+    large superpages (\S\ref{sec:mem_clustering}).
+
+  \item \textbf{The hybrid isolation boundary} --- MMU outside the
+    framekernel, Rust inside, with an explicit degradation path --- as
+    a distinct (if unproven) point between Asterinas and seL4
+    (\S\ref{sec:aspirational}).
+
+  \item \textbf{The verification decomposition} --- hardware proofs
+    independent of the kernel, bridged by a machine-interface Iris
+    layer, then RefinedRust --- as an alternative to the seL4
+    monolithic-proof path (\S\ref{sec:unified_stack}).
+
+  \item \textbf{M:N stackless-future execution with stack-carrier
+    preemption} as a revival of scheduler activations, contingent on a
+    serialisation mechanism for migratable futures (\S\ref{sec:preemption}).
+\end{enumerate}
+
+Every one of these is a claim to be tested; none is yet established by
+measurement.  The value of this chapter is to make the list explicit,
+so that the claims can be evaluated on their merits rather than buried
+in the borrowed scaffolding.

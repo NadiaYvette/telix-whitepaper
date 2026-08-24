@@ -1,0 +1,228 @@
+\chapter{Threat Model and Security Architecture}
+\label{ch:security}
+
+A design that invokes ``formal verification for security'' and
+``hardware-enforced isolation'' must first say what it means by each.
+This chapter states the adversary, the trusted computing base, the
+isolation primitives, and the residual risks that no amount of Rust
+safety or machine-checked proof addresses.
+
+\section{Adversary Model}
+\label{sec:adversary}
+
+Telix targets the following adversaries, in decreasing order of
+assumption:
+
+\begin{description}
+  \item[Remote software attacker.] Exploits a memory-safety or
+    type-confusion bug in any non-kernel component --- a personality
+    server, a filesystem driver, a network stack continuation --- to
+    escalate privilege, exfiltrate data, or deny service.  This is the
+    adversary the architecture is primarily designed to contain.
+
+  \item[Local software attacker.] A compromised userspace server or
+    personality attempting to breach its capability bounds (read or
+    write memory outside its granted extents, forge capability tokens,
+    or issue DMA outside its IOMMU window).
+
+  \item[Device attacker.] A malicious or compromised PCIe/network
+    device issuing DMA or generating interrupts to violate isolation.
+
+  \item[Side-channel observer.] A co-resident process (possibly in a
+    different multikernel partition) using microarchitectural side
+    channels (cache, TLB, branch-predictor, prefetcher) to leak data
+    across an intended isolation boundary.
+\end{description}
+
+The following are \emph{out of scope} and should not be inferred from
+any claim in this document: physical access to hardware (probe,
+cold-boot, bus snooping), hardware trojans or malicious silicon, and
+availability under fully adversarial denial-of-service.
+
+\section{Trusted Computing Base}
+\label{sec:tcb}
+
+The \TCB is the set of components whose compromise defeats the security
+claim.  Telix's \TCB is deliberately asymmetric:
+
+\begin{itemize}
+  \item \textbf{The framekernel core} (page-table manipulation, TLB
+    shootdown, IPI delivery, IOMMU management, the \LLFree allocator,
+    and the scheduler's management loop) is trusted.  It is small
+    (\textasciitilde{}3,000--5,000 lines of Rust), written in the
+    interrupt/CPS style, and is the target of the RefinedRust proofs
+    (\S\ref{sec:kernel_verification}).
+
+  \item \textbf{External pagers, personality servers, filesystem and
+    network servers, and device drivers} are \emph{untrusted}.  They
+    are isolated processes; a compromise in any one of them must not
+    extend its capability bounds.
+
+  \item \textbf{The compiler and proof toolchain} (Rust toolchain,
+    Rocq, Iris, RefinedRust, the Sail backend) are trusted in the
+    traditional sense that a compiler is trusted: the guarantees hold
+    \emph{relative to} their correctness.  This is the same assumption
+    seL4 makes of Isabelle/HOL and its compiler pipeline.
+
+  \item \textbf{The hardware} (MMU, IOMMU, interrupt controller,
+    capability engine where present) is trusted to enforce the
+    boundaries it is configured to enforce.
+\end{itemize}
+
+The framing is therefore: the framekernel core is \emph{small but
+trusted}; the large, complex, and bug-prone components (filesystems,
+ABI emulation, network stacks) are \emph{large but untrusted}, and their
+trust is transferred to the small core plus hardware enforcement.
+
+\section{Isolation Primitives}
+\label{sec:isolation_primitives}
+
+Telix uses two distinct isolation primitives, applied at different
+boundaries:
+
+\begin{description}
+  \item[\textbf{Hardware MMU isolation.}] Between the framekernel and
+    each userspace server, and between multikernel partitions.  This is
+    the robust, proven boundary: a compromised server can touch only
+    its own address space, and the framekernel's page tables decide
+    what that space contains.  It is the fallback position if the
+    safe-language boundary below fails.
+
+  \item[\textbf{Language-enforced isolation.}] Inside the framekernel,
+    between the thin server layers that share the kernel address space.
+    Here Rust's type system (borrow checking, ownership, no aliasing of
+    mutable state) substitutes for MMU protection.  This is the
+    \emph{experimental} boundary (\S\ref{sec:aspirational}): it is
+    cheap (no context switch) but its soundness depends on the
+    correctness of every \texttt{unsafe} block in the shared region,
+    and it is the boundary a security reviewer will probe first.
+
+  \item[\textbf{Capability enforcement (CHERI/Morello).}] Where
+    available, hardware capabilities convert the software morsel bounds
+    into unforgeable, hardware-checked fat-pointer bounds
+    (\S\ref{sec:mem_cheri}), strengthening the language boundary with
+    hardware enforcement without paying address-space switch costs.
+\end{description}
+
+The two boundaries are complementary, not redundant: MMU isolation
+bounds the blast radius of a compromised large component; language
+isolation eliminates the switch cost \emph{only} for the small set of
+components that live inside the framekernel.
+
+\section{The Aspirational Boundary and Its Fallback}
+\label{sec:aspirational}
+
+As stated in \S\ref{ch:control-plane}, the language-enforced boundary
+is the least validated part of the design.  It is therefore treated as
+an \emph{optimisation}, not a foundation: the architecture is specified
+so that, if the boundary cannot be made sound, every framekernel-resident
+component can be promoted to a userspace server at the cost of one
+additional MMU boundary.  The page-clustering, CPS, capability-transport,
+and verification components are all specified independently of which
+side of the boundary they sit on; only the \emph{latency} claim depends
+on the boundary holding.
+
+This is the honest position: Telix does not \emph{rely} on Rust safety
+for isolation until it is proven; it \emph{aspires} to it, and degrades
+to a proven (but slower) boundary if necessary.
+
+\section{Side Channels and Covert Channels}
+\label{sec:side_channels}
+
+Rust safety and machine-checked functional correctness say nothing about
+\emph{information flow}.  Two classes of residual risk remain even with
+a fully verified kernel core:
+
+\begin{description}
+  \item[\textbf{Microarchitectural side channels.}] Spectre- and
+    Meltdown-class attacks observe state (caches, TLBs, predictors,
+    prefetchers) that is invisible to the architectural semantics the
+    proofs reason about.  These affect every OS; Telix's contribution
+    is limited to (a) running mutually distrusting personality servers
+    as separate processes, so they do not share an address space to
+    leak across, and (b) where CHERI is present, bounding the pointers
+    a speculative window can traverse.
+
+  \item[\textbf{Covert channels.}] Two colluding processes inside the
+    same multikernel partition can always communicate through shared
+    resources (cache occupancy, lock timing, ring latency) at a rate
+    the kernel cannot fully suppress.  Telix does not claim to prevent
+    covert channels; it claims only to make the \emph{overt} channels
+    (memory, IPC, DMA) capability-controlled and unforgeable.
+\end{description}
+
+A security claim that does not mention side channels is a claim that
+over-reaches.  Telix's security claim is therefore scoped to
+\emph{architectural} isolation (memory safety, capability bounds, DMA
+containment), and it explicitly does not include side-channel or
+covert-channel resistance.
+
+\section{Capability Forging and the DMA Boundary}
+\label{sec:capability_dma}
+
+The unforgeability of capability tokens is the linchpin of the
+zero-copy I/O model (\S\ref{sec:zerocopy_morsels}).  A capability token
+must not be constructible by its holder (only transferable and
+attenuable), or the zero-copy fast path becomes a read/write-anything
+path.  Telix enforces this in three layers:
+
+\begin{itemize}
+  \item \textbf{Software:} capability tokens are opaque handles
+    maintained by the framekernel; a server can name only the tokens it
+    has been granted, and every ring descriptor's bounds are checked
+    against the token before the driver is given a physical mapping.
+
+  \item \textbf{IOMMU:} the DMA window is the IOMMU page table, keyed to
+    the device's PCIe domain; a device cannot DMA outside the extents
+    the framekernel mapped for it (\S\ref{sec:dma_safety}).
+
+  \item \textbf{CHERI:} where present, the bounds are hardware-enforced
+    in the pointer itself, so even a speculative or buggy dereference
+    cannot escape the extent.
+\end{itemize}
+
+The residual risk is the \emph{attenuation} logic: a server granted a
+large morsel and permitted to re-grant sub-ranges must not be able to
+re-grant a range it was not given.  This is a correctness property of
+the capability manager and is part of the framekernel core's proof
+obligations.
+
+\section{Security Claims, Summarised}
+\label{sec:security_claims}
+
+\begin{table}[h]
+\centering
+\caption{What Telix claims, and on what it depends.}
+\label{tab:security_claims}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+\textbf{Claim} & \textbf{Mechanism} & \textbf{Dependency} \\
+\midrule
+Compromised server cannot read/write beyond its extents
+  & Capability tokens + MMU/IOMMU
+  & Framekernel core correctness \\
+Compromised server cannot forge tokens
+  & Opaque handles, kernel-mediated grant
+  & Capability-manager proof \\
+Device cannot DMA outside its window
+  & IOMMU page tables per PCIe domain
+  & IOMMU management proof \\
+Framekernel core memory-safe
+  & Rust + (proposed) RefinedRust proofs
+  & Toolchain correctness; $=$unsafe$=$ audit \\
+Thin layers share address space safely
+  & Rust type system (language isolation)
+  & \emph{Aspirational} --- fallback: MMU \\
+Side-channel resistance
+  & ---
+  & \emph{Not claimed} \\
+Covert-channel resistance
+  & ---
+  & \emph{Not claimed} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The table is the security model in one view: every claim is tied to the
+component whose proof or mechanism realises it, and the two claims
+Telix does \emph{not} make are stated as explicitly as the ones it does.
