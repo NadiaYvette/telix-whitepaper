@@ -233,59 +233,61 @@ domain goals:
 \section{Target Hardware Architectures \& Execution Models}
 \label{sec:target_architectures}
 
-Telix is designed to target modern 64-bit multi-core hardware platforms.
-Rather than tailoring kernel abstractions to a single ISA, Telix defines a
-uniform execution model while accommodating architectural differences in MMU
-topologies, memory consistency models, and hardware capability enforcement.
+Telix targets modern 64-bit multi-core hardware.  Rather than tailoring
+kernel abstractions to a single ISA, Telix defines a uniform execution
+model while accommodating architectural differences in MMU topologies,
+memory consistency models, and hardware capability enforcement.
 
 \begin{description}
-    \item[RISC-V (\texttt{rv64g} / \texttt{rv64gc}):] Serving as the
-	    primary open reference architecture. RISC-V provides clean
-	    software-managed page table options (Sv39/Sv48),
-	    standardized formal Sail ISA definitions
-	    \footcite{armstrong19}, and an extensible ISA interface
-	    well-suited for framekernel isolation domains. The Svnapot
-	    extensions are of particular interest for the sake of
-	    demonstrating Telix' abilities.
+    \item[\textbf{RISC-V (\texttt{rv64g} / \texttt{rv64gc}):}] The
+	    primary open reference architecture.  RISC-V provides clean
+	    software-managed page-table options (Sv39/Sv48), standardised
+	    formal Sail ISA definitions \footcite{armstrong19}, and an
+	    extensible ISA well-suited for framekernel isolation domains.
+	    The \texttt{Svnapot} extension demonstrates fine-grained
+	    superpage support, and the custom inverted-page-table MMU
+	    (\S\ref{sec:custom_mmu}) demonstrates the full range of
+	    page-clustering capabilities.
 
-    \item[ARMv8-A / ARMv9-A (AArch64):] The primary production target
-	    for high-core-count datacenter nodes and modern IoT devices.
-	    Telix explicitly accounts for AArch64's weakly-ordered
-	    memory model when synthesizing cross-core synchronization
-	    ring buffers and page table updates \footcite{sosp21vrm}.
+    \item[\textbf{ARMv8-A / ARMv9-A (AArch64):}] The primary
+	    production target for high-core-count datacenter nodes and
+	    modern IoT devices.  Telix explicitly accounts for AArch64's
+	    weakly-ordered memory model when synthesising cross-core
+	    synchronisation ring buffers and page-table updates
+	    \footcite{sosp21vrm}.
 
-    \item[LoongArch:] Mandatory because China is the future.
-    \item[MIPS:] The basic picture of sanity.
+    \item[\textbf{LoongArch:] A necessary port for deployment in
+	    the Chinese computing ecosystem, with architectural features
+	    (odd/even page-pair MMU) that exercise page-clustering code
+	    paths distinct from the radix-tree ISAs.}
 
-    \item[Capability Hardware (CHERI / Arm Morello):] Target platform
-	    for high-assurance deployments. Hardware fine-grained
-	    capabilities allow Telix to enforce spatial and temporal
-	    memory safety directly in hardware, complementing Rust's
-	    software safety guarantees within framekernels
-	    \footcite{katamaran23}. The MIPS \texttt{PageGrain}
-	    extension is of particular interest for the sake of
-	    demonstrating Telix' abilities.
+    \item[\textbf{MIPS:}] A long-standing reference for
+	    software-managed TLB refill architectures, and the vehicle
+	    for demonstrating page clustering at sub-4\,KiB granularity
+	    via the \texttt{PageGrain} extension (1\,KiB pages).
 
-    \item[x86-64:] Supported primarily for broad compatibility on
-	    commodity hardware. While x86-64 provides Total Store Order
-	    (TSO) memory semantics simplifying ring buffer mechanics,
-	    its rigid multi-level page table hierarchy demands shared
-	    page table tree strategies \footcite{ko03}. Its segregated
-	    TLBs also defeat much of the purpose of superpaging.
+    \item[\textbf{Capability Hardware (CHERI / Arm Morello):}] Target
+	    platform for high-assurance deployments.  Hardware
+	    fine-grained capabilities allow Telix to enforce spatial and
+	    temporal memory safety directly in hardware, complementing
+	    Rust's software safety guarantees within framekernels
+	    \footcite{katamaran23}.
+
+    \item[\textbf{x86-64:}] Supported for broad compatibility on
+	    commodity hardware.  x86-64 provides Total Store Order (TSO)
+	    memory semantics that simplify ring-buffer mechanics, but its
+	    rigid multi-level page-table hierarchy demands shared
+	    page-table tree strategies \footcite{ko03}, and its
+	    segregated TLB hierarchy limits the benefit of superpaging.
 \end{description}
 
-Some potential further ports might be to:
-\begin{description}
-	\item[Alpha:] DEC was the best.
-	\item[IA64:] The best architecture ever until corrupted with
-		the HPW and similar horrors.
-	\item[Motorola 68000:]
-	\item[OpenRISC:]
-	\item[PA-RISC:]
-	\item[POWER:]
-	\item[SPARC:] Beauty incarnated as a microprocessor.
-	\item[VAX:] The full 512~B page size \pageclustering\ experience.
-\end{description}
+Further ports (Alpha, IA-64, POWER, SPARC, VAX, and others) are
+feasible but not prioritised for the initial prototype.  The custom
+RISC-V inverted-page-table MMU (\S\ref{sec:custom_mmu}) exercises
+many of the page-clustering capabilities that these legacy
+architectures would otherwise demonstrate — dense superpage-size
+spectra, software-managed TLB refill, and sub-4\,KiB granularity
+— making them lower priority for the proof-of-concept effort.
 
 \section{Hardware Acceleration and Architectural Extensions}
 \label{sec:hardware_extensions}
