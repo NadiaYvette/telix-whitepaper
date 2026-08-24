@@ -305,45 +305,35 @@ illustrates the hoped-for shift.
 
 \begin{figure}[ht]
 \centering
-\begin{tikzpicture}
+\begin{tikzpicture}[scale=1]
 \begin{axis}[
-  width=0.82\textwidth,
-  height=5cm,
-  xlabel={$n$},
+  compat=newest,
+  width=\columnwidth,
+  height=5.5cm,
+  xlabel={$n$ (superpage size index)},
   ylabel={Frequency},
-  xmin=-0.5, xmax=13.5,
+  xmin=0, xmax=13,
   ymin=0, ymax=1.1,
-  xtick={0,1,2,3,4,5,6,7,8,9,10,11,12,13},
+  xtick={0,3,6,9,12},
   ytick=\empty,
-  legend style={at={(0.97,0.97)}, anchor=north east},
+  legend pos=north east,
   grid=major,
   grid style={gray!20},
 ]
-
-% Geometric (without page clustering): monotonically decreasing
-\addplot[blue,thick,mark=*,mark size=1.5pt]
-  coordinates {
-    (0,1.0) (1,0.55) (2,0.30) (3,0.17) (4,0.09)
-    (5,0.05) (6,0.03) (7,0.02) (8,0.01) (9,0.005)
-    (10,0.003) (11,0.001) (12,0.001) (13,0.0)
-  };
 \addlegendentry{Without clustering}
-
-% Negative binomial (with page clustering): mode at n=3
-\addplot[red,thick,mark=square*,mark size=1.5pt]
-  coordinates {
-    (0,0.03) (1,0.08) (2,0.12) (3,0.13) (4,0.12)
-    (5,0.09) (6,0.06) (7,0.04) (8,0.03) (9,0.02)
-    (10,0.01) (11,0.004) (12,0.002) (13,0.001)
-  };
+\addplot[blue,thick,mark=*] coordinates {
+  (0,1.0) (1,0.55) (2,0.30) (3,0.17) (4,0.09)
+  (5,0.05) (6,0.03) (7,0.02) (8,0.01) (9,0.005)
+  (10,0.003) (11,0.001) (12,0.001) (13,0.0)
+};
 \addlegendentry{With clustering}
-
-% K and Z labels
-\node[below,font=\scriptsize] at (axis cs:0,0) {$K$};
-\node[below,font=\scriptsize] at (axis cs:3,0) {$Z$};
-\node[font=\scriptsize\itshape,blue] at (axis cs:0.5,0.95) {geometric};
-\node[font=\scriptsize\itshape,red]  at (axis cs:5.5,0.17) {neg.\ binomial};
-
+\addplot[red,thick,mark=square*] coordinates {
+  (0,0.03) (1,0.08) (2,0.12) (3,0.13) (4,0.12)
+  (5,0.09) (6,0.06) (7,0.04) (8,0.03) (9,0.02)
+  (10,0.01) (11,0.004) (12,0.002) (13,0.001)
+};
+\node[below,font=\small] at (axis cs:0,0) {$K$};
+\node[below,font=\small] at (axis cs:3,0) {$Z$};
 \end{axis}
 \end{tikzpicture}
 \caption{Hoped-for effect of page clustering on the translation-size
