@@ -48,11 +48,14 @@ formally connected layers:
     constitute the bridge between the hardware proofs and any kernel
     implementation.
 
-  \item \textbf{Kernel Verification (RefinedRust).}
-    The framekernel's page-table manipulation, TLB shootdown, and IPI
-    protocol paths are translated from Rust MIR to Rocq and proven to
-    satisfy the machine interface specs using RefinedRust
-    \footcite{gaher24refinedrust} (\S\ref{sec:kernel_verification}).
+  \item \textbf{Kernel Verification (manual Iris heap\_lang).}
+    The framekernel's page-table manipulation, TLB shootdown, IPI
+    protocol, IOMMU management, and scheduler loop are specified and
+    proved manually in Iris heap\_lang.  Rather than relying on an
+    automatic Rust-to-Coq translation (RefinedRust) whose bare-metal
+    compatibility is unproven, the kernel spec is written directly in
+    the Iris language and proved against the machine interface
+    resources (\S\ref{sec:kernel_verification}).
 \end{enumerate}
 
 \begin{figure}[h]
@@ -72,8 +75,8 @@ formally connected layers:
    Sv39 proofs        Weak-memory lift          IOMMU coherence
    (coherence.v)    (gpfsl/iRC11)             (iommu_proofs.v)
                                                    │
-       Kernel code ◄── RefinedRust ◄──┘────────────┘
-         (Rust)       (MIR→Coq)       hardware guarantees
+       Kernel code ◄── manual Iris heap_lang ◄──┘────────────┘
+         (Rust)          (hand-written spec)        hardware guarantees
 \end{verbatim}
 }
 \caption{The unified verification stack: four layers, one proof assistant
@@ -223,54 +226,78 @@ four-step protocol (invalidate → local flush → IPI → wait) is entitled to
 
 \subsection{Toolchain Selection}
 
-The Rust formal verification landscape has matured substantially since
-the original RustBelt soundness proof \footcite{jung18rustbelt}. The
-following tools are evaluated for the Telix framekernel:
+Two distinct approaches exist for connecting Rust kernel code to Rocq
+proofs.  The automatic approach (RefinedRust
+\footcite{gaher24refinedrust}, Aeneas \footcite{ho22aeneas}) translates
+Rust MIR directly to Coq.  This is appealing in principle but has not
+been demonstrated on bare-metal kernel code: no \texttt{std}, raw MMIO,
+inline assembly (\texttt{sfence.vma}, \texttt{mret}), a custom allocator,
+and interrupt-driven state machines all lie outside the demonstrated
+comfort zone of these tools.
+
+Telix therefore adopts the \textbf{manual Iris heap\_lang} approach:
+the kernel's behaviour is specified by hand in Iris's built-in language
+(heap\_lang), in the style of the seL4 verification in Isabelle/HOL
+\footcite{klei09}.  The advantages:
+
+\begin{itemize}
+  \item \textbf{No toolchain risk.}  The Iris language is a known,
+    stable target with a published semantics.  There is no dependence
+    on a Rust MIR→Coq translator whose bare-metal behaviour is
+    uncharacterised.
+  \item \textbf{Direct composition with Tessera.}  The same separation
+    logic, same proof assistant, same weak-memory model (gpfsl/iRC11)
+    used in the hardware proofs is used for the kernel proofs.
+  \item \textbf{Auditable gap.}  The semantic gap between the Iris
+    spec and the Rust implementation is a single text (the Iris
+    program) that is read and audited, not a compiler pipeline whose
+    translation correctness must itself be proved.
+  \item \textbf{Assembly specialisation from Sail.}  Privileged
+    instructions (\texttt{sfence.vma}, \texttt{mret}, \texttt{csrw
+    satp}, interrupt entry/exit) are \emph{specialised} from the
+    existing Sail machine model's executable semantics, rather than
+    independently axiomatised.  This keeps the kernel's assembly
+    specification consistent with the hardware proofs by construction.
+\end{itemize}
+
+The cost: each kernel function must be modelled by hand, which is slower
+per function than an automatic translation.  The scope is bounded:
+the framekernel core is \textasciitilde{}3,000--5,000 lines of Rust,
+and not all of it is protocol-relevant.
 
 \begin{table}[h]
 \centering
-\begin{threeparttable}
-\caption{Comparative Analysis of Rust Verification Toolchains (2024--2025)}
+\caption{Viable Rust Verification Approaches (2025--2026)}
 \label{tab:verification_comparison}
-\begin{tabularx}{\textwidth}{l X X X}
+\begin{tabularx}{\textwidth}{l X X}
 \toprule
-\textbf{Toolchain} & \textbf{Approach} & \textbf{Strengths} & \textbf{Trade-offs} \\
+\textbf{Approach} & \textbf{Mechanism} & \textbf{Bare-metal suitability} \\
 \midrule
-\textbf{RefinedRust}\footnotemark
-  & Translates Rust MIR $\to$ Coq; proves functional correctness in Iris.
-  & Same separation logic as Tessera hardware proofs; handles
-    \texttt{unsafe} blocks; semi-automated.
-  & Requires Iris expertise; not yet tested on bare-metal kernel code. \\
+\textbf{Manual Iris (chosen)}
+  & Hand-write Iris heap\_lang spec; compose with Tessera hardware resources.
+  & Proven approach (seL4 precedent); no toolchain risk. \\
 \midrule
-\textbf{Aeneas}\footnotemark
-  & Translates Rust $\to$ Coq (pure functional); suited for crate-level
-    verification.
-  & Handles borrowing, lifetimes, traits; good for library/data-structure
-    proofs.
-  & Pure-functional target; less suited for imperative MMU-manipulation
-    code with side effects. \\
+RefinedRust \footcite{gaher24refinedrust}
+  & Automatic MIR $\to$ Coq translation; Iris proofs over generated model.
+  & Demonstrated on Redox userspace; \texttt{no\_std}/MMIO/assembly untested. \\
 \midrule
-\textbf{Verus}\footnotemark
-  & SMT-based (Z3); annotation-driven; no Coq connection.
-  & Most ergonomic; lowest proof burden for developers.
-  & No Iris support; cannot compose with Tessera hardware proofs;
-    no weak-memory reasoning. \\
+Aeneas \footcite{ho22aeneas}
+  & Pure-functional Rust $\to$ Coq translation; suited for libraries.
+  & Pure-functional target; ill-suited for imperative MMU code. \\
+\midrule
+Verus (SMT-based)
+  & Annotation-driven verification via Z3; no Coq/Iris connection.
+  & Cannot compose with Tessera hardware proofs or weak-memory model. \\
 \bottomrule
 \end{tabularx}
-\begin{tablenotes}
-  \small
-  \item[1]{\fullcite{gaher24refinedrust}}
-  \item[2]{\fullcite{ho22aeneas}}
-  \item[3]{Lattuada, A., et al. ``Verus: Verifying Rust Programs using
-           Linear Ghost Types.'' \emph{Proc. ACM Program. Lang.} 7,
-           OOPSLA1 (2023). \texttt{doi:10.1145/3586037}.}
-\end{tablenotes}
-\end{threeparttable}
 \end{table}
 
-\textbf{RefinedRust is the natural fit} because it embeds into Iris—the
-same separation logic that \textsc{Tessera}'s hardware proofs use. This
-means:
+\textbf{Manual Iris is the chosen path} because the scope is already
+vast and the toolchain risk of automatic translation is not worth
+bearing.  This is the same decision seL4 made (manual Isabelle
+specification rather than an automatic C-to-Isabelle translator), and
+for the same reason: the kernel is small enough that manual
+specification is tractable, and the semantic gap must be auditable.
 
 \begin{itemize}
   \item The machine interface layer (\S\ref{sec:machine_interface}) can be
@@ -290,18 +317,20 @@ means:
 
 \subsection{Scope and Limitations}
 
-Kernel Rust differs from application Rust: no \texttt{std} library, raw
-MMIO, inline assembly (\texttt{sfence.vma}, \texttt{mret}), a custom
-allocator (LLFree \footcite{litz2021llfree}), and interrupt-driven
-state machines. Adapting RefinedRust (or Aeneas) to this environment
-requires defining the machine interface Iris layer
-(\S\ref{sec:machine_interface})—a well-scoped engineering effort rather
-than an open research problem. The target scope is the
-\textbf{framekernel core} only: page-table traversal and modification,
-TLB shootdown protocol, IPI send/receive, and IOTLB invalidation
-(\textasciitilde{}3,000--5,000 lines of Rust). The external pagers,
-personality servers, filesystem, and scheduler are verified separately
-or treated as untrusted.
+The target is the \textbf{full framekernel core}: page-table traversal
+and modification, TLB shootdown protocol, IPI send/receive, IOTLB
+invalidation, the scheduler management loop, and the LLFree allocator
+(\textasciitilde{}3,000--5,000 lines of Rust).  The rationale is that
+the verification exists to address the vulnerability class identified
+by Mythos et al.; a partial core is insufficient.
+
+The proof proceeds layer by layer.  The machine interface Iris layer
+(\S\ref{sec:machine_interface}) is the first deliverable, establishing
+that the hardware theorems compose into coherent Iris resources.  Kernel
+functions are then proved against those resources function by function.
+
+The external pagers, personality servers, filesystem, and scheduler's
+user-facing EEVDF loop are verified separately or treated as untrusted.
 
 \subsection{How the Whitepaper Design Reduces Verification Surface}
 
@@ -364,13 +393,16 @@ verification:
         Iris resources (\S\ref{sec:machine_interface}) and prove they are
         sound against the generated machine model.
 
-  \item \textbf{Phase 4---RefinedRust integration.} Apply RefinedRust
-        to the framekernel core's protocol-relevant paths. Prove the
-        Rust code satisfies the machine interface specs.
+  \item \textbf{Phase 4---Kernel proofs (manual Iris).} Specify
+        the framekernel core's protocol-relevant paths in Iris
+        heap\_lang and prove they satisfy the machine interface specs
+        from Phase~3.  Proceed function by function, starting with
+        \texttt{unmap\_range} and \texttt{shootdown\_broadcast}.
+        Target scope: the full framekernel core.
 
   \item \textbf{Phase 5---External pager proofs.} Each pager (COW,
         ZFOD, page cache, KAU manager) gets its own, independent
-        RefinedRust proof. The pager's spec is ``if the kernel gives me
+        proof. The pager's spec is ``if the kernel gives me
         \texttt{pte\_token}, I will manage COW/faults correctly.''
 \end{enumerate}
 

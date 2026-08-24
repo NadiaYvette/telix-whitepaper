@@ -202,11 +202,48 @@ specifications, and the same solution applies: write a trusted
 specification ("this assembly sequence does X to the machine state"),
 prove everything else, and audit the specification by hand.
 
-#### 3c. The existence proof as a decision point
+#### 3c. Design decisions made (2026-08-24)
 
-The current whitepaper proposes verifying the *entire* framekernel core
-(3,000–5,000 lines).  An alternative, which a reviewer would find more
-credible, is to declare a **minimum viable verification milestone** — one
+The author has made four concrete scope decisions:
+
+1. **Scope: full framekernel core.** The target is the complete
+   framekernel innermost layer — page-table manipulation, IPI, IOMMU,
+   scheduler management loop, and LLFree allocator.  The rationale is
+   that the verification exists to address the vulnerability class
+   identified by Mythos et al., and a partial core is insufficient.
+   "Everything needs to be verified."
+
+2. **Toolchain: manual Iris heap_lang, not RefinedRust.**  The scope is
+   already vast; adding the risk of adapting an untested-on-bare-metal
+   MIR→Coq pipeline is not worth it.  The kernel spec will be written
+   *manually* in Iris heap_lang, as seL4 did in Isabelle.  This is
+   slower per function but eliminates all toolchain risk and the
+   `#![no_std]`/assembly/MMIO compatibility problem entirely.
+
+3. **Assembly specification: specialised from Sail.**  The privileged
+   instructions (`sfence.vma`, `mret`, `csrw satp`, interrupt entry/exit)
+   will not be independently axiomatised.  Their specifications will be
+   *specialisations* of the existing Sail machine model's executable
+   semantics — a derivative of the same model Tessera already generates
+   to Rocq.  This keeps the assembly spec consistent with the hardware
+   proofs by construction.
+
+4. **Incremental delivery.** The verification will be built layer by
+   layer rather than attempting the full core at once.  B1 (Iris
+   resources against `machine.v`) is the first deliverable and is
+   well-scoped; B3 (kernel-function proofs) proceeds function by
+   function against those resources.  The full-core target is the
+   endpoint, not the first publication.
+
+**Consequence for §3 severity:** The gap remains High (it still needs
+building), but the decisions above eliminate the three biggest sources
+of uncertainty (toolchain risk, assembly-spec ambiguity, scope
+creep).  What remains is engineering, not research.
+
+#### 3d. The existence proof as a decision point (historical note)
+
+Before the decisions above were made, a reviewer-facing alternative was
+to declare a **minimum viable verification milestone** — one
 end-to-end function, say `unmap_range` or `shootdown_broadcast` —
 and make that the existence proof that the stack works.  The rest is
 then "the same technique applied to more functions."
