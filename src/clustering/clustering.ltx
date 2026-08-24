@@ -54,7 +54,7 @@ Three distinct consistency models govern three distinct resource classes:
 
 \subsection{Capability-Bounded Caching}
 Filesystem handles are represented as capability tokens containing
-object IDs, cryptographically signed access rights, and generational
+object IDs, opaque kernel-mediated access rights, and generational
 offset invariants. Edge nodes cache read-only extent blocks in local
 sub-page pools.
 

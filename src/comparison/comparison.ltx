@@ -195,9 +195,12 @@ novel claims:
     layer, then manual Iris proofs --- as an alternative to the seL4
     monolithic-proof path (\S\ref{sec:unified_stack}).
 
-  \item \textbf{M:N stackless-future execution with stack-carrier
-    preemption} as a revival of scheduler activations, contingent on a
-    serialisation mechanism for migratable futures (\S\ref{sec:preemption}).
+  \item \textbf{Assembly of M:N stackless-future execution with
+    stack-carrier preemption} --- not a new solution to the Anderson
+    scheduler-activation problem, but the observation that io\_uring
+    rings, persistent completion queues, and stackless Rust futures
+    compose to avoid all three classic failure modes without kernel/user
+    coordination (\S\ref{sec:anderson_failure_modes}).
 \end{enumerate}
 
 Every one of these is a claim to be tested; none is yet established by

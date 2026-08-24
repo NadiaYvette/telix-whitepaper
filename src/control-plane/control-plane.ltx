@@ -127,7 +127,11 @@ isolation (address-space switches, TLB shootdowns, message
 serialisation) is paid exactly where the hardware imposes a
 communications cost anyway.
 
-\section{Per-\foreignlanguage{russian}{Матрëшка}/Matryoshka Layer IPC}Register-based trapping IPC (not blocking-synchronous like \Mach\ or
+\section{Per-\foreignlanguage{russian}{Матрëшка}/Matryoshka Layer IPC}
+
+Each layer of the matryoshka has a different IPC mechanism suited to
+its communication cost.  Register-based trapping IPC (not
+blocking-synchronous like \Mach\ or
 \seLFour) coexists with the FlexSC/\iouring\ model because the two
 mechanisms serve different scopes: a shared-memory ring cannot survive
 transmission over the wire (or airwaves) to a remote cluster node, so

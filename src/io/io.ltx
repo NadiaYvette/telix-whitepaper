@@ -10,7 +10,7 @@ syscall overhead, but introduce unnecessary latency and memory
 contention when used for intra-kernel communication where no privilege
 boundary exists.
 
-Telix resolves this via a unified, **purely asynchronous I/O model**. By
+Telix resolves this via a unified, \textbf{purely asynchronous I/O model}. By
 fusing traditional capability ports with dynamically bound lock-free
 memory rings, Telix provides a single unified notification subsystem for
 network, IPC, and storage events, ensuring cluster-wide extensibility
@@ -37,7 +37,7 @@ stacks are implemented as stackless Rust \texttt{Future} state machines.
 
 To maintain the network transparency of distributed capability routing
 while supporting zero-copy bulk data, Telix capability channels operate
-bimodally. The **Port** is the fundamental routing primitive,
+bimodally. The \textbf{Port} is the fundamental routing primitive,
 addressable across local NUMA nodes and remote cluster networks alike.
 
 \emph{Bimodal} names the two transport \emph{mechanisms} (Immediate and
@@ -62,7 +62,7 @@ Submission/Completion Queue (SQ/CQ). The Port itself ceases to carry
 payload data; instead, it acts solely as the notification "doorbell."
 
 \subsection{Port Sets as the Event Multiplexer}
-A **Port Set** allows a driver or user-space process to aggregate
+A \textbf{Port Set} allows a driver or user-space process to aggregate
 multiple Ports into a single waitable capability. When a continuation
 polls a Port Set, it can simultaneously receive fast-path cluster IPC
 messages and local SQ/CQ doorbell notifications, unifying distributed
@@ -89,8 +89,8 @@ fully lock-free.
 \label{sec:zerocopy_morsels}
 
 Passing large payloads across isolation boundaries typically requires
-costly memory copies. Telix avoids this by passing **Capability Morsel
-Tokens** inside the SQ/CQ descriptors rather than raw virtual addresses.
+costly memory copies. Telix avoids this by passing \textbf{Capability Morsel
+Tokens} inside the SQ/CQ descriptors rather than raw virtual addresses.
 
 A Capability Morsel Token wraps a physical morsel --- a contiguous,
 power-of-two-aligned extent from the coremapless allocator
@@ -112,7 +112,7 @@ Direct Memory Access (DMA) devices pose a severe threat to microkernel
 capability boundaries. A compromised PCIe device can issue DMA writes to
 arbitrary physical addresses, bypassing OS software protections.
 
-Telix enforces **Capability-Bound DMA Isolation** by integrating memory
+Telix enforces \textbf{Capability-Bound DMA Isolation} by integrating memory
 morsel capabilities with hardware IOMMUs (Intel VT-d, ARM SMMU, RISC-V
 IOPMP) \footcite{willmann06iommu}.
 

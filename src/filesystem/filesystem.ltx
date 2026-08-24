@@ -25,7 +25,7 @@ whitepaper describes the second-round prototype, which redesigns the
 architecture to correct those structural issues.
 
 In the revised Telix architecture, Virtual Memory and the VFS are
-strictly decoupled using the **External Pager** paradigm
+strictly decoupled using the \textbf{External Pager} paradigm
 \footcite{liedtke95l4, abrossimov89mach}:
 \begin{enumerate}
     \item When an application attempts to access an unmapped page of a memory-mapped file, the hardware generates a page fault.
@@ -60,8 +60,8 @@ Because Telix's base transport primitive—the Capability Port—is
 network-transparent, clustering support is not bolted onto the
 filesystem; it is an inherent property of the architecture.
 
-The Telix VFS does not actually read or write bytes; it is a **namespace
-router**. When a client application invokes
+The Telix VFS does not actually read or write bytes; it is a \textbf{namespace
+router}. When a client application invokes
 \texttt{open("/mnt/cluster/data.txt")}:
 \begin{enumerate}
     \item The client sends a path-resolution message to the root VFS server.

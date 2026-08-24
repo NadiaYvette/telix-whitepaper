@@ -7,11 +7,11 @@ guarantees for real-time task continuations with strict fair-share
 resource allocation across throughput-bound workloads.
 
 Telix addresses this by decoupling user-level execution contexts from
-physical hardware dispatch using an **M:N continuation executor model**,
-enforcing **Hierarchical Fair-Share allocation** via an **Earliest
-Eligible Virtual Deadline First (EEVDF)** engine
+physical hardware dispatch using an \textbf{M:N continuation executor model},
+enforcing \textbf{Hierarchical Fair-Share allocation} via an \textbf{Earliest
+Eligible Virtual Deadline First (EEVDF)} engine
 \footcite{stoica96eevdf, zijlstra23eevdf}, and coordinating
-cross-partition parallelism through **gang and symbiotic coscheduling**
+cross-partition parallelism through \textbf{gang and symbiotic coscheduling}
 \footcite{ousterhout82gang}.
 
 \section{Two Execution Domains}
@@ -288,7 +288,7 @@ it.
 
 To support multi-tenant isolation, containerization, and privilege
 domain separation, Telix organizes execution entities into a
-**Hierarchical Scheduling Tree**. Resource weights are distributed
+\textbf{Hierarchical Scheduling Tree}. Resource weights are distributed
 proportionally from root system nodes down to individual execution
 tasks.
 
@@ -316,7 +316,7 @@ At the core node level, Telix implements EEVDF to enforce both
 fair-share proportional service and strict latency bounds. Unlike
 completely fair schedulers (CFS) that optimize solely for accumulated
 virtual runtime ($v_i$), EEVDF explicitly calculates both
-**eligibility** (fairness) and **virtual deadlines** (latency
+\textbf{eligibility} (fairness) and \textbf{virtual deadlines} (latency
 sensitivity).
 
 \subsection{Virtual Time and Lag Accounting}
@@ -437,7 +437,7 @@ severe cascade blocking.
 \subsection{Gang and Symbiotic Coscheduling Strategy}
 
 To prevent IPC boundary stalls across multikernel partitions, Telix
-enforces **Matrix Gang Coscheduling**:
+enforces \textbf{Matrix Gang Coscheduling}:
 
 \begin{description}
     \item[\textbf{Coordinated Time Slicing:}] Multikernel partitions share a synchronized hardware timer grid. High-bandwidth communication paths register a "gang capability" requirement to lock synchronous execution windows across partition boundaries.
