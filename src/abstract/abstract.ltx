@@ -4,13 +4,14 @@ Telix is a design proposal for a general-purpose operating system
 that combines four lines of research none of which has previously
 appeared in a single system: ABI-compatible page clustering and
 superpaging for a sublinear-metadata, high-TLB-reach memory
-subsystem; a framekernel isolation model that selectively absorbs
-latency-critical servers into a Rust-enforced kernel address space
-while leaving the rest as conventional microkernel processes; M:N
-threading revived on stackless Rust futures with io\_uring-style
-completion rings; and a decomposed formal-verification strategy
-in which the hardware model (Tessera) is proved independently of
-the kernel and bridged by Iris separation-logic resources.
+subsystem; a four-layer isolation hierarchy (cluster node →
+multikernel partition → framekernel domain → userspace server)
+that aligns protection boundaries with hardware-affinity boundaries
+at each level; M:N threading revived on stackless Rust futures
+with io\_uring-style completion rings; and a decomposed
+formal-verification strategy in which the hardware model
+(Tessera) is proved independently of the kernel and bridged by
+Iris separation-logic resources.
 
 The central thesis is that page clustering and superpaging solve
 each other's weaknesses — clustering eliminates the external
