@@ -27,12 +27,17 @@ rather than wrestling every driver into Rust.
 that wrap real, battle-tested compiler frontends and extract their
 typed intermediate representations after frontend analysis.  The
 harvested IR is emitted in a common JSON interchange format called
-\textbf{OrganIR}.  Twelve shims are fully functional and bidirectional (\S\ref{sec:frank_status}):
-Haskell, Rust, Mercury, Idris~2, Lean~4, Koka, OCaml, Elixir,
-Agda, F\#, Zig, and C.  An additional eleven are scaffolded or
-in progress:
-PureScript, Swift, Julia, Erlang, Scala~3, C++, Fortran, Ada,
-Standard ML, Common Lisp, Scheme, and Prolog.
+\textbf{OrganIR}.  Eleven languages are \emph{bidirectional} — they have both an
+Organ Bank shim and a Frankenstein bridge, enabling calls in either
+direction: Erlang (and Elixir, which shares the Erlang bridge),
+F\#, GHC (Haskell), Idris~2, Koka, Mercury, OCaml, Rust, Scheme,
+and Swift.  Three additional languages (Go, Futhark, Python) have
+Frankenstein bridges but no Organ Bank shim yet, so Frankenstein
+can call them but they cannot call back.  The remaining Organ Bank
+shims — Ada, Agda, C, Common Lisp, C++, Fortran, Julia, Lean~4,
+Prolog, PureScript, Scala~3, Standard ML, and Zig — are
+unidirectional: Frankenstein can ingest their IR but they have no
+bridge for reverse calls.
 
 Rather than writing twenty-three parsers and twenty-three type
 checkers, Organ Bank reuses the real compilers as \emph{donors}.  Each
@@ -98,12 +103,13 @@ design positions are \emph{amplified} by it:
 
 As of 2026, Frankenstein is a large, functioning prototype.  Twelve
 languages can \emph{bidirectionally} call each other through the
-OrganIR interchange, and each of the twelve was chosen to exercise a
-distinct semantic issue (algebraic effects, linear types, dependent
-types, mutable state, coroutines, higher-kinded polymorphism, etc.),
+OrganIR interchange (eleven Frankenstein bridges, with Elixir sharing
+the Erlang bridge), and each was chosen to exercise a distinct
+semantic issue (algebraic effects, linear types, dependent types,
+mutable state, coroutines, higher-kinded polymorphism, etc.),
 establishing that the pipeline handles the full range of inter-language
 semantic mismatches rather than just the easy cases.  The system
-self-hosts in two ways: a default ad-hoc mode ( Organ Bank shims
+self-hosts in two ways: a default ad-hoc mode (Organ Bank shims
 harvesting typed IR from each donor compiler) and a Plotkin
 transformation mode (explicit lambda-lifting and closure conversion at
 the OrganIR level).  Organ Bank inherits the frontends of 26 real
