@@ -359,17 +359,17 @@ consequence (the shift from geometric to unimodal) is a prediction
 requiring empirical validation.  The interaction with replacement
 policy under realistic workloads introduces a different concern:
 internal fragmentation.  A $Z$-extent becomes reclaimable only when
-all of its constituent fragments have transitioned to a reclaimable
-state (clean and unpinned); individual fragment state changes ---
-dirty-to-clean writeback, pin-to-unpin, active-to-idle --- are
-described in their own terms, not as partial reclaimability.  The
-coarseness of the $Z$ mesh means that the replacement daemon, the
-zeroing path, the copy-on-write fork path, and small-file caching
-all operate at $Z$ granularity, which pessimises each of these
-operations when the workload's natural unit of allocation differs
-from $Z$.  This is the classic internal-fragmentation trade-off:
-extent allocators eliminate external fragmentation at the cost of
-coarser internal grain.
+all of its fragments are clean and all are unpinned; the individual
+fragment properties (dirty versus clean, pinned versus unpinned,
+active versus idle) are described in their own terms.  The coarseness
+of the $Z$ mesh means that the replacement daemon, the zeroing path,
+the copy-on-write fork path, and small-file caching all operate at
+$Z$ granularity, which pessimises each of these operations when the
+workload's natural unit of allocation differs from $Z$.  This is the
+classic internal-fragmentation trade-off: extent allocators eliminate
+external fragmentation at the cost of coarser internal grain.
+\S\ref{sec:mem_latency_opt} describes Telix's mitigations
+(incremental faulting and tail packing) for this coarseness.
 
 Very large superpages ($\gg Z$) are still needed for extreme-footprint
 workloads (database buffer pools, HPC arrays), but these are served by
