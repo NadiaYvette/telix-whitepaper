@@ -1,63 +1,38 @@
 \section*{Abstract}
 
-% Telix\index{Telix} is a \microkernel\ with
-% {completion\index{completion}}-based syscall interface and
-% {scheduler activations}\index{scheduler activations} with
-% upcalls\index{upcall}, and a shared memory
-% submission/completion ring buffer interface for high-traffic event
-% processing. Its {virtual memory}\index{virtual memory} system employs
-% {Dickins'}\index{Dickins}\cite{dick01} ABI compatibility
-% algorithms for {page clustering}\index{page clustering}\cite{baba79} to
-% enhance Navarro et al -style superpaging\index{superpaging}\cite{nava02}.
-% It furthermore leverages Mach\index{Mach}\cite{milo93} message-passing
-% for clustering\index{clustering}.
-% \\
+Telix is a design proposal for a general-purpose operating system
+that combines four lines of research none of which has previously
+appeared in a single system: ABI-compatible page clustering and
+superpaging for a sublinear-metadata, high-TLB-reach memory
+subsystem; a framekernel isolation model that selectively absorbs
+latency-critical servers into a Rust-enforced kernel address space
+while leaving the rest as conventional microkernel processes; M:N
+threading revived on stackless Rust futures with io\_uring-style
+completion rings; and a decomposed formal-verification strategy
+in which the hardware model (Tessera) is proved independently of
+the kernel and bridged by Iris separation-logic resources.
 
-The Telix operating system is meant to serve as a modern operating system
-design for general-purpose use.
-\begin{enumerate}
-	\item{Formal verification for security à la
-		\seLFour\footfullcite{klei09}}
-	\item{superpaging\index{superpaging}\footfullcite{nava02}}
-	\item{shared pagetables\footfullcite{ko03}}
-	\item{M:N threading\index{M:N threading} via {scheduler
-		activations}\index{scheduler activations}
-		\footfullcite{ande92}}
-		\cite{ande92} is broader, but here cited for its
-		coverage of scheduler activations.
-	\item{{asynchronous IO}\index{asynchronous IO}
-		\footfullcite{drus93}}
-	\item{coscheduling\index{coscheduling}
-		\footfullcite{oust82, feit92}}
-	\item{EEVDF\index{EEVDF} scheduling\footfullcite{stoi95}}
-	\item{\Barrelfish\ \multikernel\footfullcite{baum09}}
-		Systems are partitioned per the
-		\Barrelfish\ \multikernel\ scheme to subdivide them into
-		smaller domains within which scalability is more easily
-		achievable.
-	\item{\Asterinas\ \framekernel\footfullcite{peng24}}
-		Within a \Barrelfish-style \multikernel\ partition, shared
-		memory and shared address space domains are managed
-		using \Asterinas' \framekernel\ technique to provide a
-		safe \TCB\ (Trusted Computing Base).
-	\item{\microkernel-enabled \clustering
-		\footfullcite{zajc93, rash87, golu91, milo93}}
-	\item{completion-based system call interface
-		\footfullcite{krie06, ande91}}
-		\cite{ande91} is broader, but cited here for its
-		coverage of completion-based syscalls.
-	\item{personality\index{personality}
-		subsystem\footfullcite{gerb01, golu91}}
-		ABI compatibility with multiple OSs, where Linux,
-		Windows and others are intended.
-	\item{\pageclustering
-		\footfullcite{baba79, dick01}}
-	\item{effective use of \invertedpagetables\ where available
-		\footfullcite{tall95, huck93}}
-	\item{sublinear memory metadata footprint esp. via having no
-		direct equivalents of page
-		descriptor\index{page descriptor} arrays
-		\footfullcite{kemp14}}
-		Adapted from the database to the kernel context.
-\end{enumerate}
+The central thesis is that page clustering and superpaging solve
+each other's weaknesses — clustering eliminates the external
+fragmentation that makes superpage allocation unreliable, while
+superpaging converts clustered extents into TLB reach — and that
+no existing operating system has been designed around this
+interaction.  The memory subsystem is built on extent-based
+(morsel) accounting with no global page-descriptor array, supports
+software-managed inverted page tables for architectures that
+benefit from them, and includes a research-grade RISC-V MMU
+extension with 42 distinct translation sizes.
 
+The verification target is the full set of algorithms that interact
+with the MMU, IOMMU, and interrupt controller: page-table
+manipulation, TLB shootdown, IPI delivery, and LLFree allocation.
+Hardware invariants are proved in Rocq/Iris (\textsc{Tessera});
+kernel functions are specified manually in Iris heap\_lang and
+proved against those invariants, function by function.
+
+The system is designed for ABI compatibility with Linux, Windows,
+and other operating systems through userspace personality servers,
+giving it a practical path to real workloads rather than purely
+laboratory interest.  Target architectures include RISC-V, AArch64,
+LoongArch, MIPS, and x86-64, with CHERI as an additional isolation
+boundary where available.
