@@ -7,12 +7,14 @@ personality servers as separate processes that could be written in any
 language, the M:N executor's dependence on Rust \texttt{async} — assume
 that multiple source languages can coexist in a single system image.
 That assumption is not gratuitous: it is backed by a separate
-toolchain project, \textbf{Frankenstein} and its companion
-\textbf{Organ Bank}, which together constitute a polyglot compiler
-pipeline targeting exactly the safe, capability-enforcing, CPS-friendly
-execution model Telix describes.
+toolchain project, \textbf{Frankenstein}, which lives in two
+closely-coupled repositories (the compiler pipeline in one, the
+language-specific shims in the other) but is effectively a single
+effort.  Together, the two halves constitute a polyglot compiler
+pipeline targeting exactly the safe, capability-enforcing,
+CPS-friendly execution model Telix describes.
 
-This chapter shines a brief spotlight on them.  Neither project is
+This chapter shines a brief spotlight on the toolchain.  It is not
 a prerequisite for the Telix design: a single-language Rust
 implementation is the fallback.  But Frankenstein is already a
 large, functioning prototype (\S\ref{sec:frank_status}), and it
@@ -145,8 +147,9 @@ demonstrated that a whole OS could be written in a safe language
 (Sing\#) with sealed processes and typed IPC.  Midori extended the
 idea to a production system in C\#.  Telix updates the lineage to
 Rust, and Frankenstein takes the next step: \emph{any} safe language,
-stitched together by a common compiler pipeline.  The three projects
-— Telix, Frankenstein, and Organ Bank — are independent efforts that
-reinforce each other but are not coupled: any one of them delivers
-value alone; together they enable a polyglot, capability-enforcing,
+stitched together by a common compiler pipeline.  Telix and the
+Frankenstein toolchain are independent efforts that reinforce each
+other but are not coupled: Telix delivers value in single-language
+Rust; Frankenstein delivers value as a general-purpose polyglot
+compiler.  Together they enable a polyglot, capability-enforcing,
 formally decomposable system software stack.
