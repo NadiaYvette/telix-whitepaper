@@ -217,7 +217,11 @@ operational benefits depending on this spectrum:
 
 		This obviates reserved-pool strategies for smaller
 		superpage sizes (such as those used in {HP-UX}\index{HP-UX})
-		and reduces the need for heavyweight, unpredictable
+		and eliminates external fragmentation as a source of
+		compaction pressure.  Compaction may still be needed for
+		other reasons (NUMA placement, contiguity above $Z$, or
+		pinned-frame availability), but the structural guarantee
+		removes the most common trigger for unpredictable,
 		runtime memory compaction that has occasionally afflicted
 		Linux\index{Linux}.
 
