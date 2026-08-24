@@ -13,11 +13,13 @@ pipeline targeting exactly the safe, capability-enforcing, CPS-friendly
 execution model Telix describes.
 
 This chapter shines a brief spotlight on them.  Neither project is
-load-bearing for the Telix design: a single-language Rust
-implementation is the fallback.  But they make \emph{real} the
-ambition, expressed in \S\ref{sec:fs_language_abstraction}, of writing
-filesystem and network logic in languages whose concurrency models
-match the problem rather than wrestling every driver into Rust.
+a prerequisite for the Telix design: a single-language Rust
+implementation is the fallback.  But Frankenstein is already a
+large, functioning prototype (\S\ref{sec:frank_status}), and it
+makes \emph{real} the ambition, expressed in
+\S\ref{sec:fs_language_abstraction}, of writing filesystem and
+network logic in languages whose concurrency models match the problem
+rather than wrestling every driver into Rust.
 
 \section{Organ Bank: Harvesting Compiler Frontends}
 
@@ -25,14 +27,12 @@ match the problem rather than wrestling every driver into Rust.
 that wrap real, battle-tested compiler frontends and extract their
 typed intermediate representations after frontend analysis.  The
 harvested IR is emitted in a common JSON interchange format called
-\textbf{OrganIR}.  Shims exist (or are scaffolded) for:
-
-\begin{quote}
-GHC (Haskell), rustc (Rust), mmc (Mercury), Idris~2, Lean~4, Koka,
-OCaml, Erlang/Elixir, PureScript, Swift, Agda, F\#, Scala~3, Julia,
-Zig, C, C++, Fortran, Ada, Standard ML, Common Lisp, Scheme, and
-Prolog.
-\end{quote}
+\textbf{OrganIR}.  Twelve shims are fully functional and bidirectional (\S\ref{sec:frank_status}):
+Haskell, Rust, Mercury, Idris~2, Lean~4, Koka, OCaml, Elixir,
+Agda, F\#, Zig, and C.  An additional eleven are scaffolded or
+in progress:
+PureScript, Swift, Julia, Erlang, Scala~3, C++, Fortran, Ada,
+Standard ML, Common Lisp, Scheme, and Prolog.
 
 Rather than writing twenty-three parsers and twenty-three type
 checkers, Organ Bank reuses the real compilers as \emph{donors}.  Each
@@ -93,16 +93,37 @@ design positions are \emph{amplified} by it:
     typed interchange layer that makes this decomposition mechanical.
 \end{description}
 
-\section{Limitations and Status}
+\section{Status and Scale}
+\label{sec:frank_status}
 
-As of 2026, Frankenstein and Organ Bank are functional for polyglot
-demos and self-host bootstrap, but do not yet enforce a cross-language
-type discipline at FFI boundaries: every cross-language call is a
-uniform \texttt{i64} ABI with symbol-name resolution, and soundness
-rests on the demo author's discipline.  A cross-language FFI type
-checker — operating at the OrganIR level to verify that argument and
-return types agree across the language boundary — is the next design
-milestone.
+As of 2026, Frankenstein is a large, functioning prototype.  Twelve
+languages can \emph{bidirectionally} call each other through the
+OrganIR interchange, and each of the twelve was chosen to exercise a
+distinct semantic issue (algebraic effects, linear types, dependent
+types, mutable state, coroutines, higher-kinded polymorphism, etc.),
+establishing that the pipeline handles the full range of inter-language
+semantic mismatches rather than just the easy cases.  The system
+self-hosts in two ways: a default ad-hoc mode ( Organ Bank shims
+harvesting typed IR from each donor compiler) and a Plotkin
+transformation mode (explicit lambda-lifting and closure conversion at
+the OrganIR level).  Organ Bank inherits the frontends of 26 real
+compilers, giving Frankenstein immediate access to their type systems,
+name resolution, and optimisation passes without reimplementing any of
+them.
+
+The project's scale is substantial: the inherited compiler codebases
+alone comprise hundreds of thousands of lines, and the OrganIR
+typing and linking infrastructure adds further.  In terms of the
+potential room for expansion — additional languages, deeper type
+discipline at FFI boundaries, cross-language optimisation — the
+project's scope may ultimately rival Telix itself.
+
+The current limitation is cross-language type safety: every
+cross-language call uses a uniform \texttt{i64} ABI with symbol-name
+resolution, and soundness rests on the caller's discipline.  A
+cross-language FFI type checker — operating at the OrganIR level to
+verify that argument and return types agree across the language
+boundary — is the next design milestone.
 
 This is not a defect for Telix, because Telix's capability boundaries
 are already enforced at the \emph{message} level: a personality server
