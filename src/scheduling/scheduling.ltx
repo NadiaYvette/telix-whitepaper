@@ -414,6 +414,29 @@ per executor, sorted by $d_i$. Execution consists of invoking
     \item If the continuation returns \texttt{Poll::Pending}, the elapsed physical CPU time $\Delta t$ is charged to $v_i$, $d_i$ is updated based on the remaining quantum slice, and the executor proceeds to poll the next eligible continuation.
 \end{itemize}
 
+\subsection{Cross-Core Fairness}
+
+EEVDF as described provides \emph{local} fairness: two futures on the
+same executor (same core) receive proportional service, but two
+futures on different executors may not.  This is an intentional
+trade-off.  Per-core scheduling avoids the cache-coherence tax of a
+single global runqueue, which in practice dominates the fairness
+deficit for most workloads.
+
+The hierarchical scheduling tree (\S\ref{sec:fair_share}) provides a
+coarse-grained backstop: it caps the aggregate consumption of each
+domain (multikernel partition) by its branch weight, so a single
+overloaded core cannot starve an entire domain.  Within a domain, the
+executor assigns futures to cores; the assignment is the mechanism for
+enforcing cross-core fairness, not the per-core EEVDF loop itself.
+
+This is the same design Linux uses with per-CPU CFS runqueues:
+global fairness is approximated by periodic load balancing (task
+migration between cores), not by a global scheduler.  Telix's
+analogous mechanism is the scheduler's assignment of futures to
+executors, which can rebalance on timescales of tens of milliseconds
+without the cache-coherence cost of a global runqueue.
+
 \section{Partitioned and Gang Coscheduling}
 \label{sec:coscheduling}
 

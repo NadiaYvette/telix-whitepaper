@@ -328,10 +328,29 @@ by Mythos et al.; a partial core is insufficient.
 The proof proceeds layer by layer.  The machine interface Iris layer
 (\S\ref{sec:machine_interface}) is the first deliverable, establishing
 that the hardware theorems compose into coherent Iris resources.  Kernel
-functions are then proved against those resources function by function.
-
-The external pagers, personality servers, filesystem, and scheduler's
+functions are then proved against those resources function by function.The external pagers, personality servers, filesystem, and scheduler's
 user-facing EEVDF loop are verified separately or treated as untrusted.
+
+\subsection{Effort Estimate}
+
+seL4's proof required approximately 20--25 person-years for a single
+implementation against a single ISA.  Telix's verification target is
+smaller in three ways: (1) the hardware model and its coherence
+theorems are already proven and reusable (~12,000 lines of Rocq,
+done); (2) the framekernel core is ~3,000--5,000 lines of Rust, not
+seL4's ~10,000 lines of C, and not all of it is protocol-relevant;
+(3) the machine-interface Iris layer (~2,000 lines of Rocq) is shared
+across all kernel functions and all ISAs, so it is written once.
+
+The estimated effort is \textbf{5--10 person-years} for the framekernel
+core: ~1--2 years for the machine-interface Iris layer (the critical
+path), ~2--3 years for the kernel-function proofs (function by
+function, starting with \texttt{unmap\_range} and
+\texttt{shootdown\_broadcast}), and ~1--2 years for iteration,
+cross-architecture replay, and the Lean$\leftrightarrow$Rocq bridge.
+This is an estimate, not a commitment; the actual effort will depend on
+the complexity of the LLFree allocator's Iris model and the interaction
+between the CPS state-machine style and the Iris proofmode.
 
 \subsection{How the Whitepaper Design Reduces Verification Surface}
 

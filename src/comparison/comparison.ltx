@@ -81,10 +81,18 @@ Telix differs in three ways that are not incremental:
     external pager and personality layers that seL4 leaves to its users.
 \end{enumerate}
 
-The honest comparison: Telix does not compete with seL4 on ``verified
-kernel'' --- seL4 wins there and is real.  Telix competes on the
-\emph{memory-management and scheduling} design layered above the
-kernel boundary, where seL4 is silent.
+The honest comparison: seL4 is the only microkernel whose functional
+correctness is machine-checked end to end, and Telix does not claim to
+rival that achievement today.  What Telix does claim is a
+\emph{different decomposition} of the verification problem --- hardware
+proofs independent of the kernel, a machine-interface Iris layer, then
+manual Iris kernel proofs --- that, once complete, targets the same
+class of guarantee (functional correctness of the kernel core) while
+also covering the memory-management algorithms that seL4 left to
+unverified userspace.  Whether this decomposition is easier or harder
+than the seL4 path is an open question; the claim is only that it is
+\emph{structurally different} and suited to verifying the subsystems
+(page clustering, shootdown, IOMMU) that seL4 does not address.
 
 \section{Why Not Build on Zircon?}
 \label{sec:vs_zircon}
