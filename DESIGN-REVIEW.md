@@ -32,7 +32,7 @@ reviewer would raise, followed by what it would take to answer it.
   specialised from Sail, layer-by-layer delivery (commit `d8ed2e4`).
   The remaining work is engineering, not research.
 
-**Open count: 6 of 10 remain** (#1, #4, #5, #7, #9, #10).
+**Open count: 1 of 10 remain** (#9).
 
 ---
 
@@ -533,20 +533,32 @@ covert channels, which no amount of Rust safety addresses).
 
 ## 7. The cluster story is thin relative to its prominence
 
-**The objection.** Clustering is a headline feature (PAN, SSI, NORMA
-avoidance, transparent socket migration, process migration), but the
-chapter is short and the mechanisms are sketched: "capability-indexed
-CRDT namespace," "lease-based mutation," "socket state machines migrate."
-The distributed-systems hard parts — CAP tradeoffs, consistency of the
-CRDT namespace under partition, lease recovery, migration of *in-flight*
-state under failure — are asserted, not designed. The whitepaper
-hand-waves the one thing distributed-systems reviewers always probe:
-failure semantics.
+**Status: Resolved (commit pending).** The CRDT-namespace-as-foundation
+framing was replaced with a three-tier consistency model, each tier drawn
+from a published, deployed system:
 
-**What would answer it.** A failure model (what happens when a node
-dies mid-lease, mid-migration, mid-CRDT-merge) and a statement of the
-consistency guarantee actually offered (eventual? per-object linearizable?
-lease-bounded?).
+- **Tier 1 (device/peripheral access):** Discovery + session lease
+  (OpenHarmony DSoftBus model). Singleton resources, no CRDT.
+- **Tier 2 (file/data sharing):** Close-to-open (NFSv4 model).
+  Last-close-wins for file-data conflicts.
+- **Tier 3 (namespace metadata):** State-based CRDT set (Shapiro et
+  al. 2011) for directory listings and namespace entries only — a
+  narrow, well-defined role.
+
+A full failure model section was added: lease expiry, partition
+behaviour, migration failure (origin-retains-until-ack), and
+authority-node failover (deferred to future direction).
+
+The clustering chapter now explicitly frames itself as feature parity
+using off-the-shelf algorithmic designs; the innovation is in the
+virtual-memory subsystem, not the distributed-systems mechanisms.
+
+**Decisions made:**
+1. **Device access model:** Discovery + session lease (same as OpenHarmony).
+2. **File sharing model:** Close-to-open (same as NFSv4).
+3. **CRDT role:** Narrowed to namespace-metadata convergence only.
+4. **Failure model:** Lease-bounded throughout; migration = origin-retains-until-ack; authority failover = future direction.
+5. **Framing:** Clustering is feature parity, not innovation.
 
 ## 8. No comparison to the systems it claims to supersede
 
@@ -603,22 +615,15 @@ questions determine the answer to #10 as well.
 
 | # | Vulnerability | Severity | Status |
 |---|--------------|----------|--------|
-| 1 | Framekernel boundary asserted | High | **Open** (paired with #10) |
-| 4 | Stackless-futures extreme | Medium | **Open** (paired with #9) |
-| 5 | Clustering guarantee narrow | Medium | **Open** |
-| 7 | Cluster story thin | Medium | **Open** |
-| 9 | M:N revival burden | Medium | **Open** (paired with #4) |
-| 10 | Rust-for-isolation unexamined | Medium | **Open** (paired with #1) |
+| 9 | M:N revival burden | Medium | **Open** |
+| 1 | Framekernel boundary asserted | High | **Resolved** (4 decisions, degradation scoped, isolation hierarchy) |
+| 4 | Stackless-futures extreme | Medium | **Resolved** (Option A now, B later, O(state), migration=helper not headline) |
+| 5 | Clustering guarantee narrow | Medium | **Resolved** (compaction claim softened, compaction may still be needed for NUMA/contiguity) |
+| 7 | Cluster story thin | Medium | **Resolved** (three-tier consistency model + failure model) |
+| 10 | Rust-for-isolation unexamined | Medium | **Resolved** (merged with #1; unsafe count deferred, assembly = Sail specialisation) |
 | 2 | No empirical validation | — | **Decided** (correctness=verification, performance=empirical) |
 | 3 | Verification-implementation gap | — | **Decided** (manual Iris, full core, Sail-specialised) |
 | 6 | No threat model | — | **Addressed** (ch:security) |
 | 8 | No comparisons | — | **Addressed** (ch:comparison) |
 
-The six open items form three natural clusters:
-
-- **#1 + #10** — the isolation story: can the framekernel boundary be
-  defended, and is Rust-alone isolation conditional on proof/CHERI?
-- **#4 + #9** — the execution model: can stackless futures carry the
-  scheduler-activation revival, and is migration serializable?
-- **#5 + #7** — the two "narrow but real" items: scope the clustering
-  guarantee, and give the cluster story a failure model.
+The remaining item is #9 (M:N / scheduler-activation revival).

@@ -12,7 +12,7 @@ explicit capability-driven message-passing control plane.
 \section{System Positioning: Heterogeneous Edge \& PAN Topologies}
 \label{sec:clustering_positioning}
 
-Telix scales seamlessly from sub-4~KiB memory-constrained sensor nodes running MIPS \texttt{PageGrain} hardware \footcite{mips_pra_6_02} up to high-core-count server partitions running RISC-V \texttt{Svnapot} superpages \footcite{riscv_priv_1_12}.
+Telix scales from sub-4~KiB memory-constrained sensor nodes running MIPS \texttt{PageGrain} hardware \footcite{mips_pra_6_02} up to high-core-count server partitions running RISC-V \texttt{Svnapot} superpages \footcite{riscv_priv_1_12}.
 
 \begin{description}
     \item[\textbf{Personal Area Networks (PANs):}] Low-power wireless nodes (BLE, Ultra-Wideband, IEEE 802.15.4) act as remote peripherals within a unified distributed capability domain. Memory-constrained PAN nodes export localized peripheral endpoints while offloading heavy async continuation processing to primary nodes.
@@ -20,28 +20,60 @@ Telix scales seamlessly from sub-4~KiB memory-constrained sensor nodes running M
     \item[\textbf{Competitive Positioning vs. \OpenHarmony\ \& Fuchsia:}] \OpenHarmony\ achieves multi-device integration by running full Android/Linux subsystems linked via RPC daemons. Fuchsia uses Zircon channels with explicit FIDL IPC interfaces. Telix eliminates the dual-runtime penalty by compiling uniform zero-copy Rust continuation channels locally, which dynamically wrap into lightweight networked packet frames when crossing physical transport boundaries.
 \end{description}
 
-\section{Distributed Filesystem Access State}
+\section{Three-Tier Consistency Model}
+\label{sec:consistency_model}
+
+Telix's clustering is a feature-parity capability, not a research contribution: every consistency mechanism is drawn from published, deployed systems. The novelty is in the system's \emph{other} components (virtual memory, framekernel isolation, formal verification); clustering adopts off-the-shelf algorithmic designs from the distributed-systems literature and implements them as OS kernel components.
+
+Three distinct consistency models govern three distinct resource classes:
+
+\begin{description}
+    \item[\textbf{Tier 1: Device/Peripheral Access — Discovery + Session Lease.}]
+        A device (camera, speaker, sensor) is a singleton resource physically attached to one node. Sharing it across nodes is a distributed-lock problem, not a replication problem. Telix uses the same model as \OpenHarmony's DSoftBus\footcite{openharmony23}: a device announces itself via local-network discovery; a capability handle acts as a time-bounded \emph{session lease} granting exclusive access to one node. If the lessee disconnects or the lease TTL expires, another node acquires the lease. There is no merge, no CRDT, and no consistency question beyond ``who holds the lease now.''
+
+    \item[\textbf{Tier 2: File/Data Sharing — Close-to-Open (NFSv4 model).}]
+        Shared files follow NFSv4 close-to-open consistency\footcite{nfsv4_rfc7530}: writes are flushed to the authority on \texttt{close()} and become visible to readers on the next \texttt{open()}. This is the same model that has served NFS for decades — well-understood, widely deployed, and appropriate for the PAN file-sharing use case (e.g., dragging a file from a tablet to a laptop, where two nodes rarely edit the same file concurrently). File conflicts under partition are resolved as last-close-wins; Telix does not attempt to merge divergent file contents, as that is an application-level problem.
+
+    \item[\textbf{Tier 3: Namespace Metadata — CRDT-Bounded Eventual Convergence.}]
+        The capability namespace (directory listings, device registrations, file metadata) is the one place where multi-writer divergence under partition genuinely arises: two nodes on opposite sides of a partition might each independently add entries to the same directory. For this narrow problem, Telix uses a state-based CRDT set (Conflict-Free Replicated Data Type)\footcite{shapiro11crdt} that guarantees convergence on reconnect: the union of all additions made on either side of the partition is the reconciled state. This is a narrowly scoped role — it covers only the namespace index, not file data and not device ownership — and the CRDT itself is a standard, off-the-shelf design.
+\end{description}
+
+\section{Distributed Filesystem Access}
 \label{sec:distributed_fs}
 
-Telix eschews centralized VFS locks in favor of a capability-indexed, conflict-free replicated data type (CRDT) namespace, building on concepts from Plan 9 \footcite{pike90plan9} and modern distributed object stores.
+\subsection{Capability-Bounded Caching}
+Filesystem handles are represented as capability tokens containing object IDs, cryptographically signed access rights, and generational offset invariants. Edge nodes cache read-only extent blocks in local sub-page pools.
 
-\subsection{Capability-Bounded Distributed Caching}
-Filesystem handles are represented as capability tokens containing object IDs, cryptographically signed access rights, and generational offset invariants.
-\begin{itemize}
-    \item \textbf{Ephemeral Edge Caching:} Edge nodes cache read-only extent blocks in local sub-page pools.
-    \item \textbf{Lease-Based Mutation:} Write operations require acquiring a transient, single-writer capability lease from the authority node. If a low-power PAN node loses connectivity, the lease automatically expires without stalling host execution.
-\end{itemize}
+\subsection{Lease-Based Mutation}
+Write operations require acquiring a transient, single-writer capability lease from the authority node. If a low-power PAN node loses connectivity, the lease automatically expires without stalling host execution. Writes committed before disconnection are flushed on the next reconnection; in-flight writes at the moment of disconnection are discarded and re-issued. This is identical to the NFSv4 close-to-open contract.
 
-\section{Distributed Network Access State}
+\section{Distributed Network Access}
 \label{sec:distributed_net}
 
 Networking in a Telix cluster is decoupled from physical interface ownership. Socket state machines operate as distributed continuations that can dynamically migrate between hardware network interface cards (NICs).
 
 \subsection{Transparent Socket Migration}
 Instead of pinning a socket to a specific node's TCP/IP stack:
-1. Sockets are registered as virtual channels within the \multikernel\ transport routing layer.
-2. Packet processing queues are exposed as memory-mapped submission and completion rings (\iouring-style).
-3. When a device moves across physical PAN access points, the socket continuation state remains active while the underlying ring buffer transport re-binds to the new physical link layer without dropping protocol connection state.
+\begin{enumerate}
+    \item Sockets are registered as virtual channels within the \multikernel\ transport routing layer.
+    \item Packet processing queues are exposed as memory-mapped submission and completion rings (\iouring-style).
+    \item When a device moves across physical PAN access points, the socket continuation state remains active while the underlying ring buffer transport re-binds to the new physical link layer without dropping protocol connection state.
+\end{enumerate}
+
+\section{Failure Model}
+\label{sec:cluster_failure}
+
+The clustering architecture is designed for PAN/IoT topologies where nodes join and leave routinely, connectivity is intermittent, and partitions are expected. The failure model is \emph{lease-bounded} throughout:
+
+\begin{description}
+    \item[\textbf{Node disconnection.}] Every distributed capability (device lease, file write lease, namespace entry) carries a TTL. If the lease holder stops renewing, the lease expires and the capability is released. The maximum unavailability window is one lease TTL, typically 100~ms--1~s in PAN deployments. This is the default failure mode and is indistinguishable from intentional disconnection.
+
+    \item[\textbf{Partition (split-brain).}] A network partition splits the cluster into two or more sub-groups. On each side, nodes continue operating with the capabilities whose leases they held before the partition. New acquisitions require the authority node, which resides on only one side of the partition. On reconnect, CRDT sets converge the namespace, last-close-wins resolves any file-data conflicts, and device leases that expired during the partition are re-acquired. There is no fencing — the lease-TTL mechanism is sufficient for PAN topologies where partitions are brief and write conflicts are rare.
+
+    \item[\textbf{Continuation migration failure.}] When a continuation is serialised for migration, the origin node retains the serialised state until the destination acknowledges successful resumption. If the destination fails before the ack, the origin times out and resumes execution locally. No ``in-flight limbo'' state exists: the continuation is either running on the origin (before ack) or running on the destination (after ack). This is Option~A (origin-retains-until-ack) from the serialisation-mechanism discussion in \S\ref{sec:task_migration}.
+
+    \item[\textbf{Authority-node failure (future direction).}] The current design assumes a designated authority node for the capability namespace. Failover of the authority — using shared-disk fencing and quorum election, as in DYNIX/ptx, Veritas Cluster, and Oracle RAC — is a documented future direction, not a claimed capability of the initial system. The initial deployment target (PAN/IoT) does not require it; the failover path exists if Telix is ever deployed in a server-failover context.
+\end{description}
 
 \section{Process and Continuation State Migration}
 \label{sec:task_migration}
