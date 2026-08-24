@@ -44,6 +44,19 @@ the M:N continuation model and the EEVDF scheduler.
     This cooperative fast path is zero-cost and suffices for
     I/O-bound work, which dominates.
 
+    The absence of a stack bars \emph{timer} preemption only.  A
+    trap (syscall or page fault) is a different, involuntary kind
+    of suspension point: the future is not \emph{rebuilt} but
+    \emph{parked}, its register state captured in a transient trap
+    frame (not a runtime stack) while its persistent state remains
+    in the struct.  The trap is surfaced to the executor as a
+    synthetic \texttt{Pending} plus a blocked event, and the future
+    resumes later by restoring the trap frame and re-entering the
+    faulting instruction.  This is the streamlined, Nemesis/K42-style
+    upcall of \S\ref{sec:async_page_faults}: the stackless model and the
+    blocking-syscall/page-fault case compose because a trap frame is
+    transient machine context, not per-task stack storage.
+
     Preemption of user work is provided by two \emph{stack
     carriers}, described in \S\ref{sec:preemption}: (A) a kernel
     stack at syscall/fault entry, making the kernel-side execution
@@ -96,7 +109,7 @@ Telix resolves the historic M:N scheduler activation trap by combining non-block
 \begin{description}
     \item[\textbf{User-Space Tasks ($M$):}] Light-weight user tasks are implemented as stackless Rust \texttt{Future} state machines. Tasks allocate zero dedicated kernel stack memory while idle.
 
-    \item[\textbf{Kernel Executors ($N$):}] A fixed pool of $N$ kernel worker continuations (typically one per physical CPU core of the Framekernel domain) poll and drive eligible user tasks.  Executors are themselves TCB-internal continuations: when no user future is eligible, the executor idles (e.g., via \texttt{WFI}) and resumes on the next interrupt.
+    \item[\textbf{Kernel Executors ($N$):}] A fixed pool of $N$ kernel worker continuations (typically one per physical CPU core of the Framekernel domain) poll and drive eligible user tasks.  Each executor divides cleanly into two parts.  Its \emph{management loop} — choosing the eligible future, updating lag, and deciding what to poll next — is core-adjacent, non-preemptible TCB code, and it is \emph{all} the core does; when no user future is eligible, the executor idles (e.g., via \texttt{WFI}) and resumes on the next interrupt.  The \texttt{Future::poll()} invocation itself is a \emph{handoff} out of the TCB into the preemptible layer: it executes arbitrary user code and, under Carrier~A, arbitrary preemptible kernel code, neither of which is a TCB continuation.
 
     \item[\textbf{Non-Blocking I/O Boundary:}] System calls and hardware I/O operations are submitted asynchronously via memory-mapped submission rings (\texttt{io\_uring}-style). Rather than blocking the kernel executor thread, a waiting task yields its state machine back to the scheduler ring, allowing executor $N$ to immediately poll the next ready task.
 \end{description}
@@ -104,12 +117,15 @@ Telix resolves the historic M:N scheduler activation trap by combining non-block
 \section{Preemption via Stack Carriers}
 \label{sec:preemption}
 
-A stackless future has no suspension point between \texttt{await}s.  To
-provide real preemption of user work (so that a compute-bound future
-cannot monopolise a core), Telix attaches a \emph{stack carrier} to a
-future at precisely the moments where preemption matters.  The future
-itself remains stackless and serialisable; the carrier is transient and
-reusable.
+A stackless future has no \emph{timer-preemptible} suspension point
+between \texttt{await}s.  A trap (syscall or page fault) is a genuine
+involuntary suspension point, but it is carried by a transient trap
+frame rather than a stack, so it does not make the future stackful.
+To provide real preemption of user work (so that a compute-bound
+future cannot monopolise a core), Telix attaches a \emph{stack
+carrier} to a future at precisely the moments where preemption
+matters.  The future itself remains stackless and serialisable; the
+carrier is transient and reusable.
 
 \subsection{Carrier A: Kernel Stacks at Syscall Entry}
 

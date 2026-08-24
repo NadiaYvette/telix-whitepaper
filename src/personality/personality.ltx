@@ -33,6 +33,7 @@ Queue (SQ) without triggering a context switch; execution completion entries
 are asynchronously posted back to the Completion Queue (CQ).
 
 \subsection{Asynchronous Page Faults and Specialized Upcalls}
+\label{sec:async_page_faults}
 
 Rather than using the fully general, heavyweight upcall machinery originally
 proposed in classic Scheduler Activations \footcite{ande92}, Telix adopts a
