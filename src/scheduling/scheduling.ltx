@@ -169,9 +169,18 @@ Telix's contribution with respect to scheduler activations is not a new
 solution to the Anderson problem; it is the observation that three
 well-understood, published mechanisms, when combined, avoid all three
 failure modes without requiring kernel/user scheduler coordination
-(upcalls).  The system's research contribution lies in the virtual-memory
-subsystem (page clustering, superpaging, inverted page tables); the
-scheduler is infrastructure assembled from known good components.
+(upcalls).  More fundamentally, Telix takes the position that the M:N
+model was not wrong — it was premature.  Anderson et al.
+(1991) identified the right goal (lightweight user-level concurrency
+with kernel cooperation) but lacked the mechanisms that make it
+implementable without the fragile upcall machinery that sank
+first-generation M:N kernels.  Io\_uring-style submission rings were
+not described until Axboe (2019); memory-mapped completion rings are
+infeasible without wide cache-coherent memory hierarchies; stackless
+futures require a language-level async abstraction that did not exist
+in C.  The abandonment of M:N in kernels was historically correct given
+the tools of the time; Telix argues that the tools have caught up and
+the original M:N insight can finally be realised.
 
 \section{Preemption via Stack Carriers}
 \label{sec:preemption}
