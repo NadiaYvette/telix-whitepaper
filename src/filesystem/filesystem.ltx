@@ -5,7 +5,7 @@ In monolithic operating systems, the Virtual Filesystem (VFS) and block
 storage layers are deeply entangled with the kernel's virtual memory
 subsystem (via the page cache) and synchronization primitives. Telix
 abandons this monolithic coupling. The Framekernel fundamentally does
-not understand files, directories, or mount points. 
+not understand files, directories, or mount points.
 
 Instead, the VFS and all concrete filesystem implementations operate
 entirely as isolated, privileged user-space servers. By leveraging the
@@ -17,7 +17,7 @@ transparently distributed, language-agnostic cluster service.
 \label{sec:fs_vm_decoupling}
 
 The first-round prototype of Telix tightly coupled VFS handling with the
-virtual memory layer to facilitate memory-mapped I/O (\texttt{mmap}). 
+virtual memory layer to facilitate memory-mapped I/O (\texttt{mmap}).
 The prototype demonstrated the feasibility of page clustering and morsel
 accounting at small scale, but its monolithic VFS/VM coupling violated
 microkernel isolation and complicated distributed caching.  This
@@ -47,7 +47,7 @@ DMA or cluster RPCs.
 
 However, moving the VFS to user space allows Telix to implement storage
 servers in high-level, memory-safe languages with advanced concurrency
-models (e.g., Haskell, Mercury, or Koka) \footcite{hunt07singularity}. 
+models (e.g., Haskell, Mercury, or Koka) \footcite{hunt07singularity}.
 \begin{itemize}
     \item \textbf{Algebraic Effect Handlers:} Languages like Koka can naturally model asynchronous I/O and capability passing as algebraic effects. The compiler automatically transforms linear, synchronous-looking filesystem code into the asynchronous continuation state machines required by the Telix runtime.
     \item \textbf{High-Level Rings:} The complex lock-free mechanics of the mapped Submission/Completion Queues (SQ/CQ) are completely abstracted by the language's runtime environment, allowing filesystem developers to focus entirely on on-disk structural logic.
