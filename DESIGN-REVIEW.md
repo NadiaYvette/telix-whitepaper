@@ -140,19 +140,26 @@ claim depends on the correctness of every one of these assertions.
    can be promoted to servers; the privileged set stays in the
    kernel and its isolation is hardware-enforced"?
 
-3. **What is the `unsafe` surface, quantitatively?** Has anyone
-   counted the `unsafe` blocks in the framekernel core? A number
-   (e.g., "~200 `unsafe` blocks, each auditable by hand") is far
-   more defensible than silence.
+3. **What is the `unsafe` surface, quantitatively?** Resolved
+   (2026-08-24): the count cannot be produced yet because the code
+   does not exist.  The current effort is a second-generation
+   prototype (successor to the unverified first prototype) aimed at
+   significantly more end-user-facing usability, but it has not yet
+   concretised the design enough to make meaningful predictions
+   about the number of `unsafe` blocks.  The whitepaper therefore
+   commits to counting them, with a prominent note that the figure
+   must be filled in as the verified effort progressively replaces
+   prototype components.  The writing of the number is deferred
+   until the code base exists to measure it.
 
 4. **Is the isolation claim conditional?** The current wording
    implies Rust safety is sufficient. A more honest formulation:
    "The framekernel's language-level isolation is conditional on
-   either (a) RefinedRust/manual-Iris proofs of every `unsafe`
-   block, or (b) CHERI hardware enforcing the same bounds in
-   silicon. Until one of those is true, the design relies on MMU
-   isolation for the privileged triad and on Rust safety as an
-   additional, not a primary, boundary."
+   either (a) manual-Iris proofs of every `unsafe` block, or (b)
+   CHERI hardware enforcing the same bounds in silicon. Until one
+   of those is true, the design relies on MMU isolation for the
+   privileged set and on Rust safety as an additional, not a
+   primary, boundary."
 
 ## 2. No empirical validation anywhere in the design
 

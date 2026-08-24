@@ -97,6 +97,23 @@ boundaries:
     correctness of every \texttt{unsafe} block in the shared region,
     and it is the boundary a security reviewer will probe first.
 
+    \bigskip
+    \noindent
+    \textbf{The \texttt{unsafe} surface is committed to be counted,
+    but not yet countable.}
+    The framekernel's \texttt{unsafe} blocks (MMIO access, raw
+    page-table walks, inline assembly, interrupt entry/exit,
+    LLFree's in-band free-frame metadata) are the points where Rust's
+    guarantees are suspended and the programmer asserts correctness.
+    Telix commits to counting, auditing, and bounding them, but the
+    count cannot be produced at the design stage: the current effort
+    is a second-generation prototype — the successor to the unverified
+    first prototype — aimed at significantly more end-user-facing
+    usability, and it has not yet concretised the code base enough to
+    yield a meaningful number.  The figure will be filled in as the
+    verified implementation progressively replaces prototype
+    components.
+
   \item[\textbf{Capability enforcement (CHERI/Morello).}] Where
     available, hardware capabilities convert the software morsel bounds
     into unforgeable, hardware-checked fat-pointer bounds
