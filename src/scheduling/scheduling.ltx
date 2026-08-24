@@ -103,8 +103,10 @@ Traditional kernel thread models rely on 1:1 mapping, where every user-space thr
 
 Conversely, legacy user-level M:N threading models (mapping $M$ user threads onto $N$ kernel OS threads) suffered from severe kernel-blindness: if one user thread triggered a blocking system call or page fault, the underlying kernel thread blocked, stalling the remaining $M-1$ user threads bound to that executor \footcite{ande92}.
 
-\subsection{The Telix M:N Continuation Solution}
-Telix resolves the historic M:N scheduler activation trap by combining non-blocking continuation state machines with memory-mapped completion rings:
+\subsection{The Telix M:N Continuation Model}
+Telix's M:N executor combines three well-understood, published mechanisms — io\_uring-style async submission rings, memory-mapped completion queues, and EEVDF per-core scheduling — into a coherent two-execution-domain architecture.  None of these mechanisms is novel; the contribution is their integration into a unified framekernel design alongside the virtual-memory innovations that are the system's primary research contribution.  The three classic scheduler-activation failure modes identified by Anderson et al.~\footcite{ande91,ande92} are avoided by design, as detailed in \S\ref{sec:anderson_failure_modes} below.
+
+The components:
 
 \begin{description}
     \item[\textbf{User-Space Tasks ($M$):}] Light-weight user tasks are implemented as stackless Rust \texttt{Future} state machines. Tasks allocate zero dedicated kernel stack memory while idle.
@@ -113,6 +115,63 @@ Telix resolves the historic M:N scheduler activation trap by combining non-block
 
     \item[\textbf{Non-Blocking I/O Boundary:}] System calls and hardware I/O operations are submitted asynchronously via memory-mapped submission rings (\texttt{io\_uring}-style). Rather than blocking the kernel executor thread, a waiting task yields its state machine back to the scheduler ring, allowing executor $N$ to immediately poll the next ready task.
 \end{description}
+
+\subsection{Anderson Failure Modes and How Telix Avoids Them}
+\label{sec:anderson_failure_modes}
+
+Scheduler activations were abandoned in practice because user-level M:N
+models without kernel cooperation suffer three well-characterised
+failure modes~\footcite{ande91,ande92}.  Telix does not claim to have
+\emph{solved} scheduler activations; rather, the three Anderson modes
+are avoided by construction because each maps to a published,
+independently-validated mechanism:
+
+\begin{description}
+  \item[\textbf{Mode~1 — blocking-syscall stall.}]
+    If one user thread issues a blocking syscall, the kernel thread
+    executing it blocks, and the $M-1$ other user threads sharing that
+    kernel thread stall.  Telix avoids this entirely: all I/O is
+    submitted through memory-mapped submission rings
+    (\texttt{io\_uring}-style~\footcite{axbo19}), a future awaiting
+    I/O returns \texttt{Poll::Pending} without the kernel executor ever
+    entering a blocking path, and the executor immediately polls the
+    next eligible future.  The kernel executor never blocks on a
+    syscall, so there is no carrier thread to stall.
+
+  \item[\textbf{Mode~2 — lost wakeups.}]
+    In a pure user-level scheduler, the kernel does not know the
+    scheduler's state.  A wakeup (I/O completion, timer fire) that
+    arrives while the scheduler is between poll cycles can be silently
+    dropped because there is no kernel-visible thread to deliver it to.
+    Telix avoids this by replacing signal-based wakeup with persistent
+    memory-mapped completion rings: completed operations are enqueued
+    atomically into a ring buffer the executor drains each poll cycle.
+    A wakeup is never ``delivered'' and therefore never lost — it is
+    ``enqueued'' and consumed when the executor next polls.
+
+  \item[\textbf{Mode~3 — compute-bound monopoly.}]
+    A user-level scheduler cannot preempt a compute-bound thread that
+    never yields, because it lacks the kernel privilege to take a CPU
+    away.  Telix addresses this with the two stack carriers of
+    \S\ref{sec:preemption}: Carrier~A (a kernel stack at
+    syscall/fault entry) makes kernel-side execution
+    timer-preemptible, and Carrier~B (demotion to a preemptible
+    carrier thread with a real stack) provides preemption for
+    userspace-side compute.  Both carriers are transient; the future
+    remains stackless in the common non-compute-bound case.  This
+    design follows the Linux pattern of demoting overrunning softirqs
+    to \texttt{ksoftirqd} kthreads: the non-preemptible fast path is
+    preserved, and a bounded escape hatch provides preemption for the
+    tail that needs it.
+\end{description}
+
+Telix's contribution with respect to scheduler activations is not a new
+solution to the Anderson problem; it is the observation that three
+well-understood, published mechanisms, when combined, avoid all three
+failure modes without requiring kernel/user scheduler coordination
+(upcalls).  The system's research contribution lies in the virtual-memory
+subsystem (page clustering, superpaging, inverted page tables); the
+scheduler is infrastructure assembled from known good components.
 
 \section{Preemption via Stack Carriers}
 \label{sec:preemption}

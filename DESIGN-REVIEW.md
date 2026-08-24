@@ -575,21 +575,24 @@ seL4, Zircon, Redox, Theseus, RedLeaf, and Asterinas.
 
 ## 9. The M:N / scheduler-activation revival carries a burden of proof
 
-**The objection.** Scheduler activations (Anderson et al., 1991) were
-abandoned in practice because the upcall machinery and the kernel/user
-scheduler coordination were found to be fragile and complex. Telix
-revives the idea (as "streamlined, Nemesis/K42-style upcalls") on top of
-stackless futures. The claim that stackless futures *solve* the
-scheduler-activation trap (kernel-blindness, lost-wakeup, preemption)
-needs to be demonstrated, not asserted. The scheduler chapter's own
-evolution (adding stack carriers to recover preemption) is evidence the
-problem is not fully solved by stacklessness alone.
+**Status: Resolved (commit pending).** The scheduling chapter now
+contains an explicit "Anderson Failure Modes and How Telix Avoids Them"
+subsection (\S\ref{sec:anderson_failure_modes}) that:
 
-**What would answer it.** A precise statement of how the classic
-scheduler-activation failure modes (a blocking syscall stalling M-1
-threads; preemption of a compute-bound thread) are each addressed, which
-the two-execution-domain model now attempts but which has not been
-validated.
+- Names all three classic failure modes (blocking-syscall stall,
+  lost wakeups, compute-bound monopoly) with citations to
+  Anderson et al. (SOSP '91, TOCS '92)
+- Maps each mode to its independently-published mechanism
+  (io\_uring rings, completion queues, ksoftirqd-style demotion)
+- Explicitly states the contribution is assembly of known techniques,
+  not a new solution to scheduler activations
+- Frames the scheduler as infrastructure assembled from known good
+  components; the research contribution is in the virtual-memory
+  subsystem (page clustering, superpaging, inverted page tables)
+
+The subsection title was changed from "Solution" to "Model" and the
+"resolves the historic M:N scheduler activation trap" phrasing was
+removed.
 
 ## 10. Dependence on Rust's type system for *kernel* isolation is unexamined
 
@@ -615,7 +618,7 @@ questions determine the answer to #10 as well.
 
 | # | Vulnerability | Severity | Status |
 |---|--------------|----------|--------|
-| 9 | M:N revival burden | Medium | **Open** |
+| 9 | M:N revival burden | Medium | **Resolved** (Anderson failure modes subsection, assembly of known techniques) |
 | 1 | Framekernel boundary asserted | High | **Resolved** (4 decisions, degradation scoped, isolation hierarchy) |
 | 4 | Stackless-futures extreme | Medium | **Resolved** (Option A now, B later, O(state), migration=helper not headline) |
 | 5 | Clustering guarantee narrow | Medium | **Resolved** (compaction claim softened, compaction may still be needed for NUMA/contiguity) |
@@ -626,4 +629,4 @@ questions determine the answer to #10 as well.
 | 6 | No threat model | — | **Addressed** (ch:security) |
 | 8 | No comparisons | — | **Addressed** (ch:comparison) |
 
-The remaining item is #9 (M:N / scheduler-activation revival).
+All 10 design vulnerabilities are now resolved or addressed.
