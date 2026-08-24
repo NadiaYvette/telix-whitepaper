@@ -12,8 +12,137 @@ management techniques to establish a scalable, general-purpose system
 architecture.
 
 \section{Motivations}
+\label{sec:motivations}
 
-I should come up with something to say here.
+Telix exists at the intersection of three convictions, none of which
+is unique to this project but whose combination has not been attempted
+in a single system.
+
+\subsection{The Page-Clustering\,/\,Superpaging Synergy}
+
+The original motivating observation is that \pageclustering\ and
+\superpaging\ solve each other's weaknesses.  Superpaging reduces TLB
+pressure but is unreliable: hardware superpages fail under external
+fragmentation, and the larger the superpage the rarer the contiguity.
+\pageclustering\ eliminates external fragmentation at the allocation
+unit $Z$, making smaller superpages ($Z$ and upward) reliable.
+Conversely, \pageclustering\ alone only changes the physical-accounting
+granularity; without superpaging to convert larger mappings into TLB
+entries, the benefit never reaches the hardware.  Together they create
+a regime where the allocation unit $Z$ becomes an attractor in the
+translation-size distribution (\S\ref{sec:mem_clustering}), the modal
+mapping size rises from the hardware base page to something much
+larger, and TLB reach expands with it.
+
+This interaction has been visible in fragmentary form since
+Dickins' 2003 64\,GiB x86 boot, but it has never been explored
+systematically at the design level: how does an entire memory
+subsystem change when the \emph{reliable} allocation size is not the
+hardware page but a multi-page extent?  Telix is the attempt to
+answer that question from the ground up.
+
+\subsection{Decisions the Literature Got Right (and the Market Got Wrong)}
+
+Several design decisions that the systems-research community converged
+on in the 1990s were abandoned not because they were incorrect but
+because the enabling infrastructure did not yet exist, or because the
+market's gravitational pull toward Linux compatibility made them
+uneconomical to maintain.  Telix revisits them with the benefit of
+two decades of hardware and language evolution:
+
+\begin{description}
+  \item[\textbf{M:N threading.}] Scheduler activations (Anderson et
+    al., 1991) correctly identified the goal — lightweight user-level
+    concurrency with kernel cooperation — but were implemented before
+    io\_uring-style completion rings, cache-coherent shared memory,
+    and language-level async abstractions existed.  The abandonment
+    of M:N in Linux, FreeBSD, and Solaris was \emph{historically}
+    correct; Telix argues the tools have caught up
+    (\S\ref{sec:anderson_failure_modes}).
+
+  \item[\textbf{The microkernel.}] Mach, L4, and their successors
+    won the architectural argument — minimal kernel, services in
+    userspace, capability-based IPC — and lost the market to
+    Linux's monolithic momentum.  Telix's framekernel is a
+    microkernel with a thin Rust-enforced in-kernel layer for
+    latency-critical components; the microkernel structure
+    remains the fallback if the framekernel boundary proves
+    unsound (\S\ref{ch:control-plane}).
+
+  \item[\textbf{Inverted page tables and dense size spectra.}]
+    Architectures with software-managed TLBs (MIPS, SPARC, Itanium,
+    POWER) can use inverted page tables sized to the number of
+    \emph{mappings} rather than pages.  Dense superpage-size
+    spectra ($W = 1$, dozens of distinct translation sizes) are
+    natural in an inverted table and catastrophic in a radix
+    tree.  Both ideas were abandoned when hardware converged on
+    radix-tree walkers; Telix resurrects them as a research
+    prototype (\S\ref{sec:custom_mmu}), in part to demonstrate
+    that page clustering's benefits are not limited to the
+    sparse spectra of x86 and ARM.
+
+  \item[\textbf{Extent-based (not per-page) memory accounting.}]
+    Main-memory databases abandoned per-row metadata decades ago;
+    operating systems still maintain a \texttt{struct page} (or
+    equivalent) for every 4\,KiB frame.  The morsel/LLFree
+    allocator (\S\ref{sec:mem_coremapless}) eliminates the
+    global descriptor array at the cost of a structural change
+    to the allocator — a change that is impossible to retrofit
+    into a mature kernel but straightforward in a new one.
+\end{description}
+
+In each case, Telix's claim is not that the idea is new.  The claim is
+that the idea was right, and that the combination of modern hardware,
+Rust's type system, and a greenfield implementation makes it
+implementable without the compromises that sank its predecessors.
+
+\subsection{Formal Verification of Operating-System Algorithms}
+
+The seL4 project proved it is possible to verify a microkernel's
+correctness end-to-end.  CertiKOS extended this to a concurrent kernel
+with fine-grained locking.  But neither project verified the
+\emph{memory-management policy}: page replacement, superpage promotion
+and demotion, the shootdown protocol, the interaction between the
+allocator and the TLB coherence model.  These are the algorithms that
+dictate whether a kernel performs well, not just whether it is
+correct.
+
+Telix's verification target (Chapter~\ref{ch:verification}) is the full
+set of algorithms that interact with the MMU, the IOMMU, and the
+interrupt controller — the page-table manipulator, the TLB shootdown
+protocol, the IPI delivery mechanism, the IOMMU invalidation path, and
+the LLFree allocation and free paths.  By modelling the hardware in
+Sail and proving its invariants in Rocq/Iris independently of the
+kernel (the \textsc{Tessera} project), and by writing the kernel's
+specification directly in Iris heap\_lang and proving it against those
+hardware invariants, the verification task decomposes into manageable
+pieces: hardware proofs (\textasciitilde{}12,000 lines, already done),
+a machine-interface Iris layer, and then kernel-function proofs one
+function at a time.
+
+This is not a claim that Telix is verified today.  It is a claim that
+the verification \emph{strategy} — hardware model independent of
+kernel, bridged by Iris resources, kernel proved against those
+resources — is structurally different from the seL4 monolithic-proof
+approach, and is suited to verifying the memory-management layer that
+seL4 and CertiKOS left to untrusted userspace.
+
+\subsection{The Practical Horizon}
+
+A verified kernel that runs no existing software is a laboratory
+artifact.  Telix's personality subsystem (\S\ref{ch:personality})
+is designed to run unmodified Linux and Windows binaries through
+userspace ABI emulation servers, giving the kernel a practical path
+to real workloads.  The economic motivation is straightforward:
+the operating systems that dominate deployed computing (Linux,
+Windows, and increasingly OpenHarmony and Zircon) were designed
+before formal verification, before Rust, and before the current
+understanding of TLB-pressure economics.  A kernel that matches
+their ABI compatibility while providing stronger isolation
+guarantees, sublinear metadata scaling, and verifiable correctness
+for its security-critical paths is an existence proof that the
+next generation can do better — and the existence proof is what
+Telix aims to be.
 
 \section{Core Architectural Principles}
 
