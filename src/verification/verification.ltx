@@ -38,7 +38,7 @@ formally connected layers:
     A multi-architecture machine model—the MMU, TLBs, page tables,
     IOMMU, interrupt controller, timer, and device topology—is specified
     in Sail, mechanically generated to Rocq, and proven correct with
-    \textasciitilde{}12,000 lines of machine-checked proofs
+    \textasciitilde{}27,000 lines of machine-checked proofs
     (\S\ref{sec:hw_proofs}).
 
   \item \textbf{Machine Interface Iris Layer.}
@@ -62,7 +62,7 @@ formally connected layers:
 \centering
 {\small
 \begin{verbatim}
-   Sail ISA specs ──► Rocq Machine model (Tessera, ~12K lines proven)
+   Sail ISA specs ──► Rocq Machine model (Tessera, ~27K lines proven)
        (upstream)            │
                              │ provides Iris specs
                              ▼
@@ -336,7 +336,7 @@ user-facing EEVDF loop are verified separately or treated as untrusted.
 seL4's proof required approximately 20--25 person-years for a single
 implementation against a single ISA.  Telix's verification target is
 smaller in three ways: (1) the hardware model and its coherence
-theorems are already proven and reusable (~12,000 lines of Rocq,
+theorems are already proven and reusable (~27,000 lines of Rocq,
 done); (2) the framekernel core is ~3,000--5,000 lines of Rust, not
 seL4's ~10,000 lines of C, and not all of it is protocol-relevant;
 (3) the machine-interface Iris layer (~2,000 lines of Rocq) is shared
@@ -492,7 +492,7 @@ maintained as of 2025--2026:
 
 \textsc{Tessera}'s build is a single script
 (\texttt{hardware/rocq/build.sh}) that compiles every module
-(\textasciitilde{}12,000 lines of Rocq) in \textasciitilde{}8 minutes
+(\textasciitilde{}27,000 lines of Rocq) in \textasciitilde{}10 minutes
 on a modern laptop, with automatic axiom-hygiene checking. The full
 hardware-trust line—upstream Sail models $\to$ generated Rocq $\to$ pure
 proofs $\to$ gpfsl weak-memory proofs $\to$ multi-arch replay—is in one
