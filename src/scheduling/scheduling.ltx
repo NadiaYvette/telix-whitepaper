@@ -35,17 +35,22 @@ the M:N continuation model and the EEVDF scheduler.
     tracks their virtual time, computes eligibility and virtual
     deadlines, and selects which future to poll next.
 
-    Crucially, user futures are \emph{not} preempted in the
-    traditional sense: no timer interrupt will rip control away
-    mid-instruction.  Instead, the executor runs a future until it
-    hits an \texttt{await} and voluntarily yields, then consults
-    the EEVDF red-black tree before re-polling.  If the just-yielded
-    future has exceeded its fair share (negative lag, $L_i < 0$),
-    the executor simply polls a different future instead.  The
-    ineligible future sits in the hold queue until $V_e(t)$ catches
-    up to its $v_i(t)$.  This achieves the \emph{scheduling
-    semantics} of preemption — no future can monopolise a core —
-    without actual timer-based preemption of Rust code.
+    A stackless future has no per-task stack, so it cannot be
+    suspended mid-poll by a timer interrupt: the executor runs a
+    future until it hits an \texttt{await} and voluntarily yields,
+    then consults the EEVDF red-black tree before re-polling.  If
+    the just-yielded future has exceeded its fair share (negative
+    lag, $L_i < 0$), the executor polls a different future instead.
+    This cooperative fast path is zero-cost and suffices for
+    I/O-bound work, which dominates.
+
+    Preemption of user work is provided by two \emph{stack
+    carriers}, described in \S\ref{sec:preemption}: (A) a kernel
+    stack at syscall/fault entry, making the kernel-side execution
+    of a future preemptible; and (B) a demotion path that migrates
+    a compute-bound future to a preemptible carrier thread with a
+    real stack.  Both preserve the stackless, serialisable nature
+    of user futures in the common case.
 \end{description}
 
 \begin{figure}[h]
@@ -64,7 +69,7 @@ the M:N continuation model and the EEVDF scheduler.
     node[midway, right, font=\footnotesize] {EEVDF dispatch};
 
   % Bottom layer: User Futures (EEVDF-scheduled)
-  \draw[thick, -{Stealth}] (0,1) -- (12,1) node[right] {\small User Futures (EEVDF-scheduled, yield-at-await)};
+  \draw[thick, -{Stealth}] (0,1) -- (12,1) node[right] {\small User Futures (EEVDF-scheduled, yield-at-await, stack-carrier preemptible)};
   \draw[fill=green!15] (0.5,0.3) rectangle (2.5,1.7) node[pos=.5,font=\footnotesize] {Future\_A};
   \draw[fill=green!15] (3.5,0.3) rectangle (5.5,1.7) node[pos=.5,font=\footnotesize] {Future\_B};
   \draw[fill=red!15]  (6.5,0.3) rectangle (8.5,1.7) node[pos=.5,font=\footnotesize] {Future\_C};
@@ -95,6 +100,77 @@ Telix resolves the historic M:N scheduler activation trap by combining non-block
 
     \item[\textbf{Non-Blocking I/O Boundary:}] System calls and hardware I/O operations are submitted asynchronously via memory-mapped submission rings (\texttt{io\_uring}-style). Rather than blocking the kernel executor thread, a waiting task yields its state machine back to the scheduler ring, allowing executor $N$ to immediately poll the next ready task.
 \end{description}
+
+\section{Preemption via Stack Carriers}
+\label{sec:preemption}
+
+A stackless future has no suspension point between \texttt{await}s.  To
+provide real preemption of user work (so that a compute-bound future
+cannot monopolise a core), Telix attaches a \emph{stack carrier} to a
+future at precisely the moments where preemption matters.  The future
+itself remains stackless and serialisable; the carrier is transient and
+reusable.
+
+\subsection{Carrier A: Kernel Stacks at Syscall Entry}
+
+Each executor maintains a pool of $N$ kernel stacks (one per core; only
+\emph{runnable} futures consume one).  When a user future crosses into
+the kernel — via a trap, page fault, or syscall ring submission — the
+entry path switches to a kernel stack, exactly as in a conventional
+kernel-thread syscall entry.  From that point the kernel-side execution
+is a normal preemptible context: a timer interrupt can save the kernel
+frame (which contains the in-flight poll), run the EEVDF scheduler, and
+switch to another future's kernel frame.  Idle and waiting futures
+consume no stack, preserving the memory advantage of the M:N model.
+
+This carrier makes \emph{kernel-side} execution preemptible — the
+classic fairness hazard (kernel work monopolising a core).
+
+\subsection{Carrier B: Demotion to a Preemptible Carrier Thread}
+
+The remaining gap is \emph{userspace-side} compute: a future spinning in
+userspace without syscalls or \texttt{await}s.  The EEVDF executor
+measures elapsed wall time per poll.  If a poll exceeds a budget (a
+configurable threshold, e.g., a few milliseconds), the future is
+\emph{demoted}: it is migrated to a preemptible carrier thread with its
+own real stack, which re-polls the future.  A timer interrupt can now
+preempt that thread anywhere, including mid-poll in userspace.  When the
+future later blocks (hits an \texttt{await}) or its fair share is
+restored, it may be promoted back to the cooperative executor.
+
+This mirrors the Linux pattern of demoting overrunning softirqs to
+\texttt{ksoftirqd} kthreads: the non-preemptible fast path is preserved,
+and a bounded escape hatch provides preemption for the tail that needs
+it.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[xscale=1.0, yscale=0.6]
+  % Timeline of a future's lifecycle
+  \draw[thick, -{Stealth}] (0,2.5) -- (14,2.5) node[right] {\small Future lifecycle};
+
+  % Cooperative phase
+  \draw[fill=green!20] (0.5,1.6) rectangle (4.5,3.4) node[pos=.5,align=center,font=\footnotesize]
+    {\textbf{Cooperative}\\ stackless poll\\ (no syscalls, awaits only)};
+  % Syscall carrier
+  \draw[fill=blue!20] (4.5,1.6) rectangle (8.0,3.4) node[pos=.5,align=center,font=\footnotesize]
+    {\textbf{Syscall}\\ kernel-stack carrier\\ (Carrier A)};
+  % Demotion carrier
+  \draw[fill=red!25] (8.0,1.6) rectangle (11.5,3.4) node[pos=.5,align=center,font=\footnotesize]
+    {\textbf{Demoted}\\ carrier thread\\ (Carrier B)};
+  % Back to cooperative
+  \draw[fill=green!20] (11.5,1.6) rectangle (13.5,3.4) node[pos=.5,font=\footnotesize] {coop};
+
+  \node[font=\footnotesize] at (2.5,1.1) {yield-at-await};
+  \node[font=\footnotesize] at (6.2,1.1) {timer-preemptible};
+  \node[font=\footnotesize] at (9.7,1.1) {timer-preemptible};
+\end{tikzpicture}
+\caption{The two stack carriers.  Cooperative polling (green) is the
+  default; Carrier A provides preemption while a future is inside the
+  kernel; Carrier B provides preemption for compute-bound userspace
+  futures via demotion.}
+\label{fig:stack_carriers}
+\end{figure}
 
 \section{Hierarchical Fair-Share Allocation}
 \label{sec:fair_share}
@@ -185,9 +261,10 @@ executing on that core.
 
 \subsection{Async Continuation Polling Integration}
 
-In Telix's Framekernel domains, ready user futures are indexed in an
-augmented Red-Black tree per executor, sorted by $d_i$. Execution consists
-of invoking \texttt{Future::poll()}:
+The cooperative fast path proceeds as follows.  In Telix's Framekernel
+domains, ready user futures are indexed in an augmented Red-Black tree
+per executor, sorted by $d_i$. Execution consists of invoking
+\texttt{Future::poll()}:
 
 \begin{itemize}
     \item If the continuation returns \texttt{Poll::Ready}, execution completes, the task is evicted from the tree, and its remaining positive or negative lag balance $L_i$ is amortized across active domain peers.
