@@ -207,23 +207,26 @@ operational benefits depending on this spectrum:
 		external fragmentation}.  The reason is structural: $Z$
 		is the physical allocation unit, and the framekernel's
 		LLFree allocator (\S\ref{sec:mem_coremapless}) is an
-		extit{extent} allocator, not a per-page buddy allocator —
-		there is no smaller allocation that could split a $Z$-sized
-		extit{fragment} free extent.  (Allocation can still fail for
-		other reasons — global memory exhaustion, or because an
-		extit{existing} $Z$-sized extent elsewhere is pinned and
-		must be freed by a page-replacement daemon — but external
-		fragmentation is eliminated as a failure mode.)
+		\textit{extent} allocator, not a per-page buddy allocator.
+		There is no smaller allocation that could split a $Z$-sized
+		\textit{fragment} free extent.
+
+		Allocation can still fail for reasons other than external
+		fragmentation.  Global memory exhaustion is always possible,
+		and an existing $Z$-sized extent might be pinned awaiting
+		eviction by a page-replacement daemon.  But external
+		fragmentation itself is eliminated as a failure mode.
 
 		This obviates reserved-pool strategies for smaller
 		superpage sizes (such as those used in {HP-UX}\index{HP-UX})
 		and eliminates external fragmentation as a source of
 		compaction pressure.  Compaction may still be needed for
-		other reasons (NUMA placement, contiguity above $Z$, or
-		pinned-frame availability), but the structural guarantee
-		removes the most common trigger for unpredictable,
+		other reasons: NUMA placement, contiguity above $Z$, or
+		pinned-frame availability.  The structural guarantee
+		removes the most common trigger — unpredictable,
 		runtime memory compaction that has occasionally afflicted
-		Linux\index{Linux}.
+		Linux\index{Linux} — but it does not make compaction
+		unnecessary.
 
 \bigskip
 \noindent
