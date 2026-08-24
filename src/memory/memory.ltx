@@ -357,14 +357,19 @@ This is a hoped-for outcome, not a theorem.  The structural guarantee
 (no external fragmentation at $Z$) is proved; the distributional
 consequence (the shift from geometric to unimodal) is a prediction
 requiring empirical validation.  The interaction with replacement
-policy under realistic workloads is an additional unknown: within a
-$Z$-extent, individual fragments may be in mixed states (some clean,
-some dirty, some pinned), and the time to drain a mixed extent
-before returning it to the free pool could introduce latency
-variability in the replacement path.  Telix's design guarantees that
-$Z$-extents are never fragmented into sub-$Z$ pieces, but the
-replacement daemon must still handle the case where only some
-fragments of a $Z$-extent are immediately reclaimable.
+policy under realistic workloads introduces a different concern:
+internal fragmentation.  A $Z$-extent becomes reclaimable only when
+all of its constituent fragments have transitioned to a reclaimable
+state (clean and unpinned); individual fragment state changes ---
+dirty-to-clean writeback, pin-to-unpin, active-to-idle --- are
+described in their own terms, not as partial reclaimability.  The
+coarseness of the $Z$ mesh means that the replacement daemon, the
+zeroing path, the copy-on-write fork path, and small-file caching
+all operate at $Z$ granularity, which pessimises each of these
+operations when the workload's natural unit of allocation differs
+from $Z$.  This is the classic internal-fragmentation trade-off:
+extent allocators eliminate external fragmentation at the cost of
+coarser internal grain.
 
 Very large superpages ($\gg Z$) are still needed for extreme-footprint
 workloads (database buffer pools, HPC arrays), but these are served by
