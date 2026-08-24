@@ -373,6 +373,18 @@ Framekernel shared address space
 
 \subsection{Incremental Verification Strategy}
 
+The first-round prototype (an unverified monolithic kernel in the
+Telix repository) demonstrated page clustering, COW fork, and the
+shootdown protocol at small scale.  It is retained as a frozen
+reference and source of test harnesses.  The second-round prototype
+--- the one this whitepaper describes --- is built incrementally,
+component by component, beside the first in the same repository.
+The verified components cannot be structured the same way as the
+prototype's monolithic VM: the framekernel/multikernel matryoshka,
+external pagers, and continuation-passing style demand a different
+code structure.  Building side-by-side lets the prototype guide the
+redesign without being entangled by it.
+
 Unlike a monolithic kernel that must be verified in one
 all-or-nothing pass, Telix's architecture supports incremental
 verification:
