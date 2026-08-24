@@ -687,11 +687,13 @@ naturally with hardware-enforced capability architectures, specifically
 
 When compiled for capability hardware, the (base, length) bounds of
 a capability morsel token are materialised as the bounds field of a
-128-bit hardware fat pointer (CHERI capability).  This transfers
-spatial memory safety enforcement from software checks to the CPU
-hardware pipeline, providing unforgeable, hardware-bounded memory
-protection for shared-memory I/O rings and Framekernel capability
-domains.
+128-bit hardware fat pointer (CHERI capability).  This adds a
+hardware-checked boundary to the software morsel bounds, providing
+unforgeable, hardware-bounded memory protection for shared-memory
+I/O rings and framekernel capability domains.  CHERI is an
+\emph{additional} isolation boundary (\S\ref{sec:isolation_primitives}),
+not a primary one: Telix must also run correctly on non-CHERI
+hardware.
 
 \section{Framekernels, Multikernels, and Address Spaces}
 \label{sec:mem_address_spaces}
@@ -718,5 +720,5 @@ microkernel processes.  This hybrid construction \emph{reduces} the
 frequency of {address space} context switches on latency-critical
 paths, without eliminating them entirely.  The boundary between
 in-framekernel and out-of-framekernel servers is experimental and
-may be adjusted as the design matures (see
-\S\ref{ch:control-plane}).
+may be adjusted as the design matures; the degradation path and
+component list are detailed in \S\ref{sec:aspirational}.

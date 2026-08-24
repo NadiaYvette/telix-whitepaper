@@ -456,6 +456,10 @@ This is a paper proof that does not require running both provers
 simultaneously. It connects the Lean-side guarantee (``if you follow
 allocation discipline, refcounts are sound'') with the Rocq-side
 guarantee (``if you follow the shootdown protocol, TLBs are coherent'').
+The bridge is currently informal but mechanisable: the joint invariant
+is a conjunction of properties each prover can check independently,
+and a future integration could export the Lean-side lemma as an axiom
+in Rocq (or vice versa) to close the gap mechanically.
 
 \section{Weak-Memory Model Soundness}
 

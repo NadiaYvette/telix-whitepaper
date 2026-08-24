@@ -127,7 +127,7 @@ isolation (address-space switches, TLB shootdowns, message
 serialisation) is paid exactly where the hardware imposes a
 communications cost anyway.
 
-\section{Per-\foreignlanguage{russian}{Матрëшка}/Matryoshka Layer IPC}
+\section{Per-Layer IPC}
 
 Each layer of the matryoshka has a different IPC mechanism suited to
 its communication cost.  Register-based trapping IPC (not
@@ -145,18 +145,18 @@ Table~\ref{tab:ipc_scopes}.
 \label{tab:ipc_scopes}
 \begin{tabularx}{\textwidth}{l X X}
 \toprule
-\textbf{Nickname} & \textbf{Scope} & \textbf{Mechanism} \\
+\textbf{Scope} & \textbf{Description} & \textbf{Mechanism} \\
 \midrule
-\foreignlanguage{russian}{малышка} / malyshka / baby
+Baby \footnotesize(\foreignlanguage{russian}{малышка})
 	& intra-partition control plane
 	& register IPC (not blocking-synchronous) \\
-\foreignlanguage{russian}{дочь} / doch / daughter
+Daughter \footnotesize(\foreignlanguage{russian}{дочь})
 	& intra-partition / intra-node data plane
 	& FlexSC/\texttt{io\_uring} shared-memory rings \\
-\foreignlanguage{russian}{мама} / mama / mum
+Mother \footnotesize(\foreignlanguage{russian}{мама})
 	& cross-NUMA-partition (same node)
 	& zero-copy shared-memory IPC \\
-\foreignlanguage{russian}{бабушка} / babushka / gran
+Grandmother \footnotesize(\foreignlanguage{russian}{бабушка})
 	& cross-cluster-node
 	& network message passing (async by nature, not a ring) \\
 \bottomrule

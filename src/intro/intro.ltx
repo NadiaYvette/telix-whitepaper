@@ -189,15 +189,9 @@ domain goals:
 	    than by hardware MMU isolation.  The remaining servers
 	    retain their own address spaces, kept out of the
 	    framekernel TCB.  This hybrid boundary is the most
-	    experimental aspect of the design (see
-	    \S\ref{ch:control-plane}); if the language-level boundary
-	    proves unsound, the two latency-motivated components
-	    (the LLFree allocator and scheduler management loop) are
-	    promoted to userspace servers behind MMU boundaries,
-	    while the privileged set — page-table manipulation,
-	    shared-PT management, TLB shootdown, and IOMMU management
-	    — remains in the kernel, exactly where it sits in seL4,
-	    L4, or any microkernel.
+	    experimental aspect of the design, and the degradation
+	    path if it proves unsound is detailed in
+	    \S\ref{sec:aspirational}.
 
     \item[Hybrid Continuation-Passing and Network-Structured Control
 	    Plane:] The kernel's control plane uses continuation-passing
