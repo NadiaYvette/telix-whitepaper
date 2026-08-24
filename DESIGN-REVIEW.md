@@ -88,18 +88,20 @@ security chapters):
 | Component | Why it's in the framekernel | Movable? |
 |-----------|----------------------------|----------|
 | Page-table manipulation | Latency-critical; every page fault touches this | Hard — every fault crosses a new MMU boundary if moved |
+| Shared page-table management | Reference-counts, clones, and replicates shared PTE subtrees across address spaces; this is a deliberate violation of the usual "address spaces are disjoint" assumption (per ko03.bib, §Extent-Driven Page Table Sharing) and requires privileged access to the hardware page-table structures | Hard — sharing/replication manipulate hardware PTEs and must be atomic with respect to the shootdown protocol |
 | TLB shootdown / IPI | Latency-critical; runs in interrupt context | Hard — IPI delivery is inherently kernel-side |
 | IOMMU management | Binds DMA windows; must be privileged | Hard — IOMMU is a privileged hardware resource |
 | LLFree allocator | Provisions physical frames on every allocation | Medium — allocator could be a separate server with a ring protocol |
 | Scheduler management loop | Selects next future; runs in the executor | Medium — scheduler could be a separate server |
 
-The page-table/shootdown/IOMMU triad is the genuinely load-bearing part:
-these are privileged operations that the hardware gives only to the
-kernel. The LLFree allocator and scheduler are in the framekernel for
-latency, not because they must be. The degradation claim ("if the
-boundary is unsound, promote to userspace at the cost of MMU
-boundaries") is therefore only partially true: the privileged triad
-cannot be promoted; the allocator and scheduler can.
+The list is not exhaustive: architectural features that violate
+simplifying assumptions about the address space — notably shared page
+tables — require correspondingly richer privileged operations in the
+framekernel.  Shared-page-table management (reference counting,
+clone-on-write for shared nodes, replication of hot nodes) is as
+load-bearing as the basic PTE read/write path, because it manipulates
+the same hardware structures and must be coordinated with the same
+shootdown protocol.
 
 #### 1c. The `unsafe` surface
 
@@ -119,19 +121,24 @@ claim depends on the correctness of every one of these assertions.
 
 #### 1d. What the author must decide
 
-1. **Which components are load-bearing for the privileged triad?**
-   The page-table manipulator, shootdown handler, and IOMMU manager
-   cannot be moved out of the framekernel (they are privileged
-   hardware operations). Are there any others that are similarly
-   non-negotiable, or is the list of three exhaustive?
+1. **Which components are load-bearing, and is the list exhaustive?**
+   The page-table manipulator, shared-page-table manager, shootdown
+   handler, and IOMMU manager cannot leave the framekernel — they
+   are privileged hardware operations.  The author additionally
+   notes that any architectural feature that violates simplifying
+   assumptions (such as the shared-page-table plan, which violates
+   the "address spaces are disjoint" assumption) may add further
+   load-bearing components to the framekernel with correspondingly
+   richer APIs.  Is there anything beyond shared page tables that
+   falls into this category?
 
 2. **Is the degradation claim scoped honestly?** The current
    whitepaper says "if the boundary is unsound, Telix degrades
-   gracefully to a pure microkernel." But the privileged triad
-   cannot be degraded. Should the claim be narrowed to "the
-   allocator and scheduler can be promoted to servers; the
-   privileged triad stays in the kernel and its isolation is
-   hardware-enforced"?
+   gracefully to a pure microkernel." But the privileged set
+   (page-table, shared-PT, shootdown, IOMMU) cannot be degraded.
+   Should the claim be narrowed to "the allocator and scheduler
+   can be promoted to servers; the privileged set stays in the
+   kernel and its isolation is hardware-enforced"?
 
 3. **What is the `unsafe` surface, quantitatively?** Has anyone
    counted the `unsafe` blocks in the framekernel core? A number
