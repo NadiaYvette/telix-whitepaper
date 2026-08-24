@@ -211,6 +211,43 @@ operational benefits depending on this spectrum:
 		memory compaction that has occasionally afflicted Linux
 		\index{Linux}.
 
+\bigskip
+\noindent
+\textbf{Empirical Effect on the Superpage-Size Distribution.}
+Without \pageclustering, the empirical frequency of translation sizes
+in a typical workload follows a monotonically decreasing distribution:
+most mappings use the smallest hardware page size ($K$), each successive
+superpage size $g_n$ sees exponentially fewer mappings, and the tail
+beyond $g_2$ is negligible.  This is the familiar power-law/exponential
+contiguity drop-off of the buddy-allocator literature.
+
+With \pageclustering, the allocation unit $Z$ acts as an attractor.
+Because allocations of size $Z$ are guaranteed never to fail due to
+external fragmentation, the memory manager preferentially (and
+reliably) serves requests at that boundary.  The empirical distribution
+shifts from a monotone decreasing exponential to a \textbf{unimodal,
+right-skewed bell}:
+\begin{itemize}
+  \item A short left tail from $K$ up to $Z$, representing residual
+        smaller mappings (incremental COW faults, tail-packing fragments);
+  \item A peak at $Z$, where the bulk of allocations concentrate;
+  \item A right tail above $Z$ that resumes the exponential drop-off
+        of the unclustered distribution, reflecting truly huge mappings
+        (database buffer pools, HPC arrays) that can exploit
+        hardware superpages when contiguity permits.
+\end{itemize}
+
+The dashed line often drawn through the right tail in sketches of this
+distribution is the \emph{unclustered} exponential — the curve that
+would obtain without the $Z$-attractor, decaying from $K$ downward.
+Page clustering effectively carves a plateau around $Z$ out of what
+would otherwise be a far steeper drop.
+
+This shift has practical consequences for TLB-management policy:
+because the modal allocation size is $Z$, the TLB refill path can be
+optimized for $Z$-sized translations, with fast-paths for smaller
+($K$-sized) fault fills and slow-paths for the uncommon large superpages.
+
     \item[\textbf{Small Minimum Mapping Granularities ($K$):}] There are
 	    few lower-bound constraints on $K$. In principle, user PTEs
 		need not even be smaller than the mapped memory; page
