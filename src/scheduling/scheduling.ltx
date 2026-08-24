@@ -5,6 +5,72 @@ Operating system schedulers in modern high-performance environments face a multi
 
 Telix addresses this by decoupling user-level execution contexts from physical hardware dispatch using an **M:N continuation executor model**, enforcing **Hierarchical Fair-Share allocation** via an **Earliest Eligible Virtual Deadline First (EEVDF)** engine \footcite{stoica96eevdf, zijlstra23eevdf}, and coordinating cross-partition parallelism through **gang and symbiotic coscheduling** \footcite{ousterhout82gang}.
 
+\section{Two Execution Domains}
+\label{sec:two_domains}
+
+Telix separates execution into two fundamentally different domains.
+This distinction is essential to understanding the relationship between
+the M:N continuation model and the EEVDF scheduler.
+
+\begin{description}
+  \item[\textbf{TCB-Internal Continuations} (framekernel code).]
+    Interrupt handlers, timer callbacks, page-fault dispatch,
+    shootdown IPI processing, and IOMMU invalidation — all code
+    within the framekernel's Trusted Computing Base — execute as
+    non-preemptible, run-to-completion continuations.  Like Linux
+    softirqs or timer callbacks, these continuations never block
+    and never yield mid-execution: they service a bounded event and
+    return.  Because the TCB is deliberately small, no individual
+    TCB continuation can hold a CPU for an unbounded duration.
+    These continuations are \emph{not} scheduled by EEVDF; they are
+    dispatched directly from the interrupt vector table or from the
+    completion of a prior TCB continuation.
+
+  \item[\textbf{User Futures} (the $M$ in $M\!:\!N$).]
+    User-space tasks — application threads, personality-server
+    request handlers, external pager logic, filesystem operations —
+    are implemented as stackless Rust \texttt{Future} state
+    machines.  These \emph{are} scheduled by the EEVDF engine.
+    They may yield at any \texttt{await} point; the EEVDF executor
+    tracks their virtual time, computes eligibility and virtual
+    deadlines, and preempts them (by not re-polling an ineligible
+    future) at the granularity of \texttt{await} points.  This is
+    \emph{not} true hardware preemption — a user future cannot be
+    interrupted mid-instruction — but it provides the scheduling
+    semantics of preemption at the application-visible level:
+    between polls, EEVDF may select a different future.
+\end{description}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[xscale=1.0, yscale=0.55]
+  % Top layer: TCB continuations (non-preemptible)
+  \draw[thick, ->] (0,4) -- (12,4) node[right] {\small TCB Continuations (non-preemptible)};
+  \draw[fill=blue!15] (0.5,3.3) rectangle (2.0,4.7) node[pos=.5,font=\footnotesize] {irq};
+  \draw[fill=blue!15] (2.2,3.3) rectangle (4.0,4.7) node[pos=.5,font=\footnotesize] {timer cb};
+  \draw[fill=blue!15] (4.2,3.3) rectangle (6.5,4.7) node[pos=.5,font=\footnotesize] {page fault};
+  \draw[fill=blue!15] (6.7,3.3) rectangle (8.5,4.7) node[pos=.5,font=\footnotesize] {IPI};
+  \draw[fill=blue!15] (8.7,3.3) rectangle (10.5,4.7) node[pos=.5,font=\footnotesize] {IOMMU};
+
+  % Arrow from TCB to user
+  \draw[magenta, thick, -{Stealth}] (6.0, 3.2) -- (6.0, 1.8)
+    node[midway, right, font=\footnotesize] {EEVDF dispatch};
+
+  % Bottom layer: User Futures (EEVDF-scheduled)
+  \draw[thick, -{Stealth}] (0,1) -- (12,1) node[right] {\small User Futures (EEVDF-scheduled, yield-at-await)};
+  \draw[fill=green!15] (0.5,0.3) rectangle (2.5,1.7) node[pos=.5,font=\footnotesize] {Future\_A};
+  \draw[fill=green!15] (3.5,0.3) rectangle (5.5,1.7) node[pos=.5,font=\footnotesize] {Future\_B};
+  \draw[fill=red!15]  (6.5,0.3) rectangle (8.5,1.7) node[pos=.5,font=\footnotesize] {Future\_C};
+  \draw[fill=green!15] (9.5,0.3) rectangle (11.0,1.7) node[pos=.5,font=\footnotesize] {Future\_A};
+  \node[font=\footnotesize, text=red!50!black] at (7.8,-0.15) {Future\_C ineligible};
+\end{tikzpicture}
+\caption{Two execution domains.  TCB continuations (top) run
+  non-preemptibly to completion.  User Futures (bottom) are dispatched
+  by the EEVDF engine and may be ineligible for re-poll if they have
+  exceeded their fair share.}
+\label{fig:two_domains}
+\end{figure}
+
 \section{Execution Model: M:N Threading via Async Continuations}
 \label{sec:mn_threading}
 
@@ -18,7 +84,7 @@ Telix resolves the historic M:N scheduler activation trap by combining non-block
 \begin{description}
     \item[\textbf{User-Space Tasks ($M$):}] Light-weight user tasks are implemented as stackless Rust \texttt{Future} state machines. Tasks allocate zero dedicated kernel stack memory while idle.
 
-    \item[\textbf{Kernel Executors ($N$):}] A fixed pool of $N$ kernel worker continuations (typically matching the physical CPU core count of the Framekernel domain) poll and drive eligible user tasks.
+    \item[\textbf{Kernel Executors ($N$):}] A fixed pool of $N$ kernel worker continuations (typically one per physical CPU core of the Framekernel domain) poll and drive eligible user tasks.  Executors are themselves TCB-internal continuations: when no user future is eligible, the executor idles (e.g., via \texttt{WFI}) and resumes on the next interrupt.
 
     \item[\textbf{Non-Blocking I/O Boundary:}] System calls and hardware I/O operations are submitted asynchronously via memory-mapped submission rings (\texttt{io\_uring}-style). Rather than blocking the kernel executor thread, a waiting task yields its state machine back to the scheduler ring, allowing executor $N$ to immediately poll the next ready task.
 \end{description}
@@ -49,24 +115,40 @@ At the core node level, Telix implements EEVDF to enforce both fair-share propor
 
 \subsection{Virtual Time and Lag Accounting}
 
-System progression is governed by global virtual time $V(t)$, which tracks the normalized service received by all active tasks. The total active weight of the local domain at physical time $t$ is:
+EEVDF is instantiated \emph{per executor} (one per physical CPU core).
+Each executor~$e$ maintains its own virtual time $V_e(t)$, active weight
+$W_e(t)$, and eligible-future red-black tree.  This avoids the
+cache-coherence tax of a single global runqueue and maps naturally to the
+per-core interrupt delivery model of the TCB layer.
+
+System progression for executor $e$ is governed by its local virtual time
+$V_e(t)$, which tracks the normalized service received by all active user
+futures assigned to that executor. The total active weight of executor
+$e$ at physical time $t$ is:
 \begin{equation}
     W(t) = \sum_{j \in \textrm{Active}} w_j
 \end{equation}
 
-Global virtual time advances continuously according to physical execution duration $\Delta t$:
+Local virtual time for executor $e$ advances according to physical
+execution duration $\Delta t$ spent executing user futures on that core:
 \begin{equation}
-    V(t + \Delta t) = V(t) + \frac{\Delta t}{W(t)}
+    V_e(t + \Delta t) = V_e(t) + \frac{\Delta t}{W_e(t)}
 \end{equation}
 
-Each task tracks its individual virtual execution time $v_i(t)$. The difference between the fluid-model target service and actual service rendered defines the task's **lag** $L_i(t)$:
+(TCB-internal continuations do not contribute to virtual time: they are
+overhead charged to \emph{all} futures proportionally, as in the Linux
+softirq model.)
+
+Each user future tracks its individual virtual execution time $v_i(t)$.
+The difference between the fluid-model target service and actual service
+rendered defines the future's \textbf{lag} $L_i(t)$:
 \begin{equation}
-    L_i(t) = w_i \cdot \big( V(t) - v_i(t) \big)
+    L_i(t) = w_i \cdot \big( V_e(t) - v_i(t) \big)
 \end{equation}
 
 \begin{itemize}
-    \item \textbf{Positive Lag ($L_i > 0$):} Task $i$ has received less service than its allocated fair share (the system owes execution time to the task).
-    \item \textbf{Negative Lag ($L_i < 0$):} Task $i$ has consumed more than its fair share (the task must yield priority to peers).
+    \item \textbf{Positive Lag ($L_i > 0$):} Future $i$ has received less service than its allocated fair share (the executor owes execution time to the future).
+    \item \textbf{Negative Lag ($L_i < 0$):} Future $i$ has consumed more than its fair share (the future must yield priority to peers).
 \end{itemize}
 
 \subsection{Eligibility and Virtual Deadline Calculation}
@@ -74,23 +156,31 @@ Each task tracks its individual virtual execution time $v_i(t)$. The difference 
 To prevent latency-sensitive tasks with small requested execution quantums ($q_i$) from being starved by compute-bound workloads, EEVDF divides dispatch evaluation into two phases:
 
 \begin{enumerate}
-    \item \textbf{Eligibility Criterion:} A task $i$ is eligible to run at virtual time $V(t)$ if and only if its virtual time does not exceed global virtual time:
+    \item \textbf{Eligibility Criterion:} A future $i$ on executor $e$ is eligible to be polled at virtual time $V_e(t)$ if and only if its virtual time does not exceed $V_e(t)$:
     \begin{equation}
-        V(t) \ge v_i(t) \quad \iff \quad L_i(t) \ge 0
+        V_e(t) \ge v_i(t) \quad \iff \quad L_i(t) \ge 0
     \end{equation}
-    Ineligible tasks ($L_i < 0$) are moved to a hold queue until global virtual time advances to match $v_i(t)$.
+    Ineligible futures ($L_i < 0$) are moved to a hold queue until $V_e(t)$ advances to match $v_i(t)$.
 
-    \item \textbf{Virtual Deadline Selection:} Among all *eligible* tasks, the scheduler selects the task with the minimum virtual deadline $d_i$. Given a requested slice quantum $q_i$, $d_i$ is computed as:
+    \item \textbf{Virtual Deadline Selection:} Among all *eligible* futures, the executor selects the future with the minimum virtual deadline $d_i$. Given a requested slice quantum $q_i$, $d_i$ is computed as:
     \begin{equation}
         d_i = v_i(t) + \frac{q_i}{w_i}
     \end{equation}
 \end{enumerate}
 
-By requesting a small time slice $q_i$, latency-critical continuations (such as device driver interrupt handlers or real-time network stack polling loops) achieve earlier virtual deadlines, obtaining immediate dispatch without exceeding their long-term weighted fair-share allocation.
+By requesting a small time slice $q_i$, latency-critical user futures
+(such as network-stack polling or interactive GUI render loops) achieve
+earlier virtual deadlines, obtaining prompt re-poll without exceeding
+their long-term weighted fair-share allocation.  TCB-internal continuations
+do not participate in this scheduling loop at all: they run immediately
+on interrupt delivery, preempting whichever user future is currently
+executing on that core.
 
 \subsection{Async Continuation Polling Integration}
 
-In Telix's Framekernel domains, ready tasks are indexed in an augmented Red-Black tree of eligible \texttt{Future} handles sorted by $d_i$. Execution consists of invoking \texttt{Future::poll()}:
+In Telix's Framekernel domains, ready user futures are indexed in an
+augmented Red-Black tree per executor, sorted by $d_i$. Execution consists
+of invoking \texttt{Future::poll()}:
 
 \begin{itemize}
     \item If the continuation returns \texttt{Poll::Ready}, execution completes, the task is evicted from the tree, and its remaining positive or negative lag balance $L_i$ is amortized across active domain peers.
