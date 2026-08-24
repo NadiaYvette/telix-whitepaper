@@ -33,12 +33,19 @@ the M:N continuation model and the EEVDF scheduler.
     machines.  These \emph{are} scheduled by the EEVDF engine.
     They may yield at any \texttt{await} point; the EEVDF executor
     tracks their virtual time, computes eligibility and virtual
-    deadlines, and preempts them (by not re-polling an ineligible
-    future) at the granularity of \texttt{await} points.  This is
-    \emph{not} true hardware preemption — a user future cannot be
-    interrupted mid-instruction — but it provides the scheduling
-    semantics of preemption at the application-visible level:
-    between polls, EEVDF may select a different future.
+    deadlines, and selects which future to poll next.
+
+    Crucially, user futures are \emph{not} preempted in the
+    traditional sense: no timer interrupt will rip control away
+    mid-instruction.  Instead, the executor runs a future until it
+    hits an \texttt{await} and voluntarily yields, then consults
+    the EEVDF red-black tree before re-polling.  If the just-yielded
+    future has exceeded its fair share (negative lag, $L_i < 0$),
+    the executor simply polls a different future instead.  The
+    ineligible future sits in the hold queue until $V_e(t)$ catches
+    up to its $v_i(t)$.  This achieves the \emph{scheduling
+    semantics} of preemption — no future can monopolise a core —
+    without actual timer-based preemption of Rust code.
 \end{description}
 
 \begin{figure}[h]
