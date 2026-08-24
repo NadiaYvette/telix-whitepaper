@@ -203,13 +203,23 @@ operational benefits depending on this spectrum:
 		breakthrough is for smaller superpage\index{superpaging}
 		sizes. By maintaining physical allocations at the $Z$
 		boundary, Telix\index{Telix} can \textit{guarantee that
-		allocations for smaller-size superpages will never fail
-		due to external fragmentation}. This eliminates the need
-		for reserved pool strategies for smaller superpage sizes
-		(such as those used in {HP-UX}\index{HP-UX}) and reduces
-		the need for the heavyweight, unpredictable runtime
-		memory compaction that has occasionally afflicted Linux
-		\index{Linux}.
+		$Z$-sized physical allocations will never fail due to
+		external fragmentation}.  The reason is structural: $Z$
+		is the physical allocation unit, and the framekernel's
+		LLFree allocator (\S\ref{sec:mem_coremapless}) is an
+		extit{extent} allocator, not a per-page buddy allocator —
+		there is no smaller allocation that could split a $Z$-sized
+		extit{fragment} free extent.  (Allocation can still fail for
+		other reasons — global memory exhaustion, or because an
+		extit{existing} $Z$-sized extent elsewhere is pinned and
+		must be freed by a page-replacement daemon — but external
+		fragmentation is eliminated as a failure mode.)
+
+		This obviates reserved-pool strategies for smaller
+		superpage sizes (such as those used in {HP-UX}\index{HP-UX})
+		and reduces the need for heavyweight, unpredictable
+		runtime memory compaction that has occasionally afflicted
+		Linux\index{Linux}.
 
 \bigskip
 \noindent
@@ -434,10 +444,11 @@ incorporates two key structural mechanisms:
 	    Copy-On-Write (COW) and Zero-Fill-On-Demand (ZFOD) anonymous
 		memory, Telix will implement incremental fault handling.
 		Rather than allocating and zeroing full allocation
-		blocks ($Z$) on initial access, the kernel incrementally
-		faults sub-fragments ($K$), reducing initial fault
-		stalls and optimizing bitblitting latency for
-		interactive applications.
+		blocks ($Z$) on initial access, the framekernel's LLFree
+		allocator provisions a $Z$-sized physical frame but
+		faults sub-fragments ($K$) one at a time as they are
+		accessed, reducing initial fault stalls and optimising
+		bitblitting latency for interactive applications.
 
     \item[\textbf{In-Memory Tail Packing:}] Small files and trailing
 	    file fragments in the page cache frequently waste memory due

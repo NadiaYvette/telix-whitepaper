@@ -14,8 +14,8 @@ In the revised Telix architecture, Virtual Memory and the VFS are strictly decou
 \begin{enumerate}
     \item When an application attempts to access an unmapped page of a memory-mapped file, the hardware generates a page fault.
     \item The Framekernel catches the fault, suspends the faulting continuation, and synthesizes an asynchronous capability message (via a Port) to the designated External Pager—in this case, the VFS Server.
-    \item The VFS Server resolves the block location, issues a bulk read via its I/O ring to the disk driver, and replies to the kernel with a Memory Morsel capability containing the loaded data.
-    \item The Framekernel maps the Morsel into the faulting application's address space and resumes the continuation.
+    \item The VFS Server resolves the block location, issues a bulk read via its I/O ring to the disk driver, and replies to the kernel with the loaded data.  The physical frame was already allocated by the framekernel's LLFree allocator on the initial fault; the pager supplies the \emph{content}, not the frame.
+    \item The Framekernel maps the populated frame into the faulting application's address space and resumes the continuation.
 \end{enumerate}
 This completely removes storage logic from the kernel's critical path while fully supporting zero-copy page caching.
 
