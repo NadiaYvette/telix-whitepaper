@@ -356,12 +356,11 @@ tier that backs them.
 \textbf{2} & \textbf{Plausible} &
   Kernel core: future allocation, executor assignment, context  
   switch, IPC transport.  Capability management: seal/unseal/  
-  transfer, authority decay.  One-architecture kernel functional  
-  correctness (RISC-V).  \\ 
+  transfer, authority decay.  Kernel functional correctness for  
+  all ported architectures (RISC-V, AArch64, LoongArch, MIPS, x86).  \\ 
 \midrule
 \textbf{3} & \textbf{Aspirational} &
   End-to-end scheduler correctness (fairness, starvation freedom).  
-  Multi-architecture kernel replay (AArch64, LoongArch, MIPS, x86).  
   Personality layer correctness (syscall translation matches Linux  
   semantics).  Framekernel isolation proof (requires RustBelt-class  
   results).  \\ 
@@ -391,15 +390,26 @@ three IOMMU walkers.
 \textbf{Tier~2} is the manual-Iris kernel verification
 (\S\ref{sec:kernel_verification}): the framekernel core's
 protocol-relevant paths, proved function by function against the
-machine interface layer.  This is the 5--10 person-year effort
-estimated below.  The target is one architecture (RISC-V) with
-structural replay to the others.
+machine interface layer.  The architecture-independent core (future
+allocation, IPC transport, capability management, LLFree allocator)
+is proved once and \emph{reused} across all ported architectures: the
+Iris proofs reference the abstract machine interface
+(\S\ref{sec:machine_interface}), not any concrete ISA.  The
+architecture-specific code---page-table walker, TLB invalidation
+instruction, interrupt entry/exit---is small (\textasciitilde{}200--500
+lines of Rust per architecture) and isolated behind the same
+interface.  For each additional architecture, only these
+\textasciitilde{}5 functions require new Iris specs; the rest of the
+proof carries over unchanged.  This is what \emph{replay} means in
+this context: not re-doing the proof, but re-checking the same proof
+scripts against a different architecture-specific implementation of
+the walker and TLB primitives.
 
-\textbf{Tier~3} properties are desirable but require either proof
-techniques that do not yet exist for Iris (scheduler fairness under
-preemption) or a labour-intensive replay across architectures that
-cannot be mechanised without cross-prover tooling.  These are stated
-as design goals, not verification guarantees.
+\textbf{Tier~3} properties are desirable but require proof techniques
+that do not yet exist for Iris (scheduler fairness under preemption)
+or a fundamentally different verification approach (framekernel
+isolation, personality correctness).  These are stated as design
+goals, not verification guarantees.
 
 \textbf{Tier~4a} properties are \emph{structurally provable}:
 asymptotic complexity theorems about algorithms in isolation.  The
@@ -430,9 +440,9 @@ tiers.  Chapter~\ref{ch:memory} and Chapter~\ref{ch:control-plane}
 make Tier~1 and Tier~2 claims.  Chapter~\ref{ch:scheduling} makes
 Tier~2 claims for the executor model and Tier~3 claims for global
 fairness.  Chapter~\ref{ch:security} states Tier~1--2 properties as
-the isolation foundation and notes Tier~3--4b as unverified.  The
-memory chapter's sublinear-metadata claim is Tier~4a.  Readers
-should match each claim to its tier to assess its provenance.
+the isolation foundation and notes Tier~3--4b as unverified.
+Chapter~\ref{ch:memory}'s sublinear-metadata claim is Tier~4a.
+Readers should match each claim to its tier to assess its provenance.
 
 \subsection{Effort Estimate}
 
@@ -445,21 +455,27 @@ seL4's ~10,000 lines of C, and not all of it is protocol-relevant;
 (3) the machine-interface Iris layer (~2,000 lines of Rocq) is shared
 across all kernel functions and all ISAs, so it is written once.
 
-The estimated effort is \textbf{5--10 person-years} for the framekernel
-core (Tier~2 of \S\ref{sec:verification_tiers}): ~1--2 years for the
-machine-interface Iris layer (the critical path), ~2--3 years for the
-kernel-function proofs (function by function, starting with
-\texttt{unmap\_range} and \texttt{shootdown\_broadcast}), and ~1--2
-years for iteration, cross-architecture replay, and the
+The estimated effort is \textbf{7--14 person-years} for all ported
+architectures (Tier~2 of \S\ref{sec:verification_tiers}): ~5--10
+years for the first architecture (RISC-V, including the
+machine-interface Iris layer and full kernel-function proofs), and
+\textasciitilde{}0.5--1 year per additional architecture
+(AArch64, LoongArch, MIPS, x86) for replay of the
+architecture-independent proofs plus new Iris specs for the
+\textasciitilde{}5 architecture-specific functions.  The first-architecture
+estimate breaks down as: ~1--2 years for the machine-interface Iris
+layer (the critical path), ~2--3 years for the kernel-function
+proofs (function by function, starting with \texttt{unmap\_range} and
+\texttt{shootdown\_broadcast}), and ~1--2 years for iteration and the
 Lean$\leftrightarrow$Rocq bridge.  Tier~3 properties (scheduler
-fairness, multi-arch replay, personality correctness) are not included
-in this estimate; their effort is unbounded until the proof techniques
-mature.  Tier~4a properties (asymptotic complexity theorems) are
-tractable as standalone Rocq proofs but are not on the critical path;
-they could be pursued in parallel with Tier~2 work.  This is an
-estimate, not a commitment; the actual effort will depend on the
-complexity of the LLFree allocator's Iris model and the interaction
-between the CPS state-machine style and the Iris proofmode.
+fairness, personality correctness, framekernel isolation) are not
+included in this estimate; their effort is unbounded until the proof
+techniques mature.  Tier~4a properties (asymptotic complexity
+theorems) are tractable as standalone Rocq proofs but are not on the
+critical path; they could be pursued in parallel with Tier~2 work.
+This is an estimate, not a commitment; the actual effort will depend
+on the complexity of the LLFree allocator's Iris model and the
+interaction between the CPS state-machine style and the Iris proofmode.
 
 \subsection{How the Whitepaper Design Reduces Verification Surface}
 
