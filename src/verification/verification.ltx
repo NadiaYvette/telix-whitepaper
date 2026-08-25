@@ -331,13 +331,13 @@ that the hardware theorems compose into coherent Iris resources.  Kernel
 functions are then proved against those resources function by function.The external pagers, personality servers, filesystem, and scheduler's
 user-facing EEVDF loop are verified separately or treated as untrusted.
 
-\subsection{Verification Scope: Four Tiers}
+\subsection{Verification Scope}
 \label{sec:verification_tiers}
 
 Not every property of a general-purpose OS can be verified with equal
-rigour.  The following four-tier taxonomy classifies Telix's verification
-targets by tractability, so that claims in later chapters can be matched
-to the tier that backs them.
+rigour.  The following taxonomy classifies Telix's verification targets
+by tractability, so that claims in later chapters can be matched to the
+tier that backs them.
 
 \begin{table}[h]
 \centering
@@ -366,12 +366,19 @@ to the tier that backs them.
   semantics).  Framekernel isolation proof (requires RustBelt-class  
   results).  \\ 
 \midrule
-\textbf{4} & \textbf{Empirical} &
-  Performance claims (TLB reach, morsel allocator throughput,  
-  clustering distribution).  Clustering consistency under real  
-  workloads.  Side-channel resilience (Spectre, Meltdown class).  
-  Polyglot type discipline (Patterson et al. framework ---  
-  implement, not prove).  \\ 
+\textbf{4a} & \textbf{Provable (asymptotic)} &
+  Sublinear boot-time metadata ($O(n)$ in ext\textendash{}ents, not  
+  total memory).  $O(1)$ amortised per-extent allocation (LLFree).  
+  $O(\log n)$ external pager page-cache lookup.  Metadata fraction  
+  bound ($\alpha\%$ of physical memory, closed-form from $Z$).  
+  Bounded walk depth (number of page-table levels).  \\ 
+\midrule
+\textbf{4b} & \textbf{Empirical} &
+  TLB reach and miss rates under real workloads.  Allocator  
+  throughput (GB/s, ops/s).  Cache hit rates for page-table walks.  
+  Clustering distribution shift (geometric $\to$ negative binomial).  
+  Side-channel resilience (Spectre, Meltdown class).  Polyglot type  
+  discipline (Patterson et al. framework --- implement, not prove).  \\ 
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -394,18 +401,37 @@ preemption) or a labour-intensive replay across architectures that
 cannot be mechanised without cross-prover tooling.  These are stated
 as design goals, not verification guarantees.
 
-\textbf{Tier~4} properties are validated empirically, not proved.
-Performance claims require measurement; side-channel resilience
-requires adversarial testing; the polyglot type discipline requires
-implementation of the Patterson et al. framework.  These are
-outside the scope of formal verification.
+\textbf{Tier~4a} properties are \emph{structurally provable}:
+asymptotic complexity theorems about algorithms in isolation.  The
+sublinear-metadata claim ($O(n)$ in ext\textendash{}ents, not total
+memory) follows from the extent-list structure; the $O(1)$ amortised
+allocation follows from LLFree's lock-free fast path; the
+$O(\log n)$ pager lookup follows from the page-cache tree height.
+These are theorems, not measurements, but they concern algorithms in
+isolation---they do not account for cache effects, hardware behaviour,
+or workload characteristics.
+
+\textbf{Tier~4b} properties are validated empirically, not proved.
+TLB miss rates, allocator throughput, and cache hit rates depend on
+workload and hardware.  Side-channel resilience requires adversarial
+testing.  The polyglot type discipline requires implementation of
+the Patterson et al. framework.  These are outside the scope of
+formal verification.
+
+The distinction between 4a and 4b matters: Tier~4a claims can be
+backed by Rocq proofs (``the metadata region is $O(n)$ for any
+physical memory size~$M$''), while Tier~4b claims require measurement
+(``the allocator sustains 2~GB/s on this hardware with this
+workload'').  A whitepaper claim backed by Tier~4a is a theorem;
+one backed by Tier~4b is a benchmark.
 
 The verification chapters in this whitepaper make claims at specific
 tiers.  Chapter~\ref{ch:memory} and Chapter~\ref{ch:control-plane}
 make Tier~1 and Tier~2 claims.  Chapter~\ref{ch:scheduling} makes
 Tier~2 claims for the executor model and Tier~3 claims for global
 fairness.  Chapter~\ref{ch:security} states Tier~1--2 properties as
-the isolation foundation and notes Tier~3--4 as unverified.  Readers
+the isolation foundation and notes Tier~3--4b as unverified.  The
+memory chapter's sublinear-metadata claim is Tier~4a.  Readers
 should match each claim to its tier to assess its provenance.
 
 \subsection{Effort Estimate}
@@ -428,9 +454,12 @@ years for iteration, cross-architecture replay, and the
 Lean$\leftrightarrow$Rocq bridge.  Tier~3 properties (scheduler
 fairness, multi-arch replay, personality correctness) are not included
 in this estimate; their effort is unbounded until the proof techniques
-mature.  This is an estimate, not a commitment; the actual effort will
-depend on the complexity of the LLFree allocator's Iris model and the
-interaction between the CPS state-machine style and the Iris proofmode.
+mature.  Tier~4a properties (asymptotic complexity theorems) are
+tractable as standalone Rocq proofs but are not on the critical path;
+they could be pursued in parallel with Tier~2 work.  This is an
+estimate, not a commitment; the actual effort will depend on the
+complexity of the LLFree allocator's Iris model and the interaction
+between the CPS state-machine style and the Iris proofmode.
 
 \subsection{How the Whitepaper Design Reduces Verification Surface}
 
