@@ -331,6 +331,83 @@ that the hardware theorems compose into coherent Iris resources.  Kernel
 functions are then proved against those resources function by function.The external pagers, personality servers, filesystem, and scheduler's
 user-facing EEVDF loop are verified separately or treated as untrusted.
 
+\subsection{Verification Scope: Four Tiers}
+\label{sec:verification_tiers}
+
+Not every property of a general-purpose OS can be verified with equal
+rigour.  The following four-tier taxonomy classifies Telix's verification
+targets by tractability, so that claims in later chapters can be matched
+to the tier that backs them.
+
+\begin{table}[h]
+\centering
+\caption{Verification scope organised by tractability tier.}
+\label{tab:verification_tiers}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Tier} & \textbf{Status} & \textbf{Properties} \\
+\midrule
+\textbf{1} & \textbf{Done} &
+  Hardware model (Sail $\to$ Rocq) for five architectures.  
+  Memory subsystem algorithms: page-table walk, TLB shootdown,  
+  IOMMU coherence under weak memory.  Timer, UART, NIC, disc  
+  device models.  Topology and placement.  \\ 
+\midrule
+\textbf{2} & \textbf{Plausible} &
+  Kernel core: future allocation, executor assignment, context  
+  switch, IPC transport.  Capability management: seal/unseal/  
+  transfer, authority decay.  One-architecture kernel functional  
+  correctness (RISC-V).  \\ 
+\midrule
+\textbf{3} & \textbf{Aspirational} &
+  End-to-end scheduler correctness (fairness, starvation freedom).  
+  Multi-architecture kernel replay (AArch64, LoongArch, MIPS, x86).  
+  Personality layer correctness (syscall translation matches Linux  
+  semantics).  Framekernel isolation proof (requires RustBelt-class  
+  results).  \\ 
+\midrule
+\textbf{4} & \textbf{Empirical} &
+  Performance claims (TLB reach, morsel allocator throughput,  
+  clustering distribution).  Clustering consistency under real  
+  workloads.  Side-channel resilience (Spectre, Meltdown class).  
+  Polyglot type discipline (Patterson et al. framework ---  
+  implement, not prove).  \\ 
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Tier~1} is the \textsc{Tessera} hardware model and its\textasciitilde{}27,000 lines of Rocq proofs (\S\ref{sec:hw_proofs}).  It
+is done.  The five-architecture coverage (RISC-V, LoongArch, AArch64,
+MIPS, x86) is verified, including weak-memory shootdown protocols and
+three IOMMU walkers.
+
+\textbf{Tier~2} is the manual-Iris kernel verification
+(\S\ref{sec:kernel_verification}): the framekernel core's
+protocol-relevant paths, proved function by function against the
+machine interface layer.  This is the 5--10 person-year effort
+estimated below.  The target is one architecture (RISC-V) with
+structural replay to the others.
+
+\textbf{Tier~3} properties are desirable but require either proof
+techniques that do not yet exist for Iris (scheduler fairness under
+preemption) or a labour-intensive replay across architectures that
+cannot be mechanised without cross-prover tooling.  These are stated
+as design goals, not verification guarantees.
+
+\textbf{Tier~4} properties are validated empirically, not proved.
+Performance claims require measurement; side-channel resilience
+requires adversarial testing; the polyglot type discipline requires
+implementation of the Patterson et al. framework.  These are
+outside the scope of formal verification.
+
+The verification chapters in this whitepaper make claims at specific
+tiers.  Chapter~\ref{ch:memory} and Chapter~\ref{ch:control-plane}
+make Tier~1 and Tier~2 claims.  Chapter~\ref{ch:scheduling} makes
+Tier~2 claims for the executor model and Tier~3 claims for global
+fairness.  Chapter~\ref{ch:security} states Tier~1--2 properties as
+the isolation foundation and notes Tier~3--4 as unverified.  Readers
+should match each claim to its tier to assess its provenance.
+
 \subsection{Effort Estimate}
 
 seL4's proof required approximately 20--25 person-years for a single
@@ -343,14 +420,17 @@ seL4's ~10,000 lines of C, and not all of it is protocol-relevant;
 across all kernel functions and all ISAs, so it is written once.
 
 The estimated effort is \textbf{5--10 person-years} for the framekernel
-core: ~1--2 years for the machine-interface Iris layer (the critical
-path), ~2--3 years for the kernel-function proofs (function by
-function, starting with \texttt{unmap\_range} and
-\texttt{shootdown\_broadcast}), and ~1--2 years for iteration,
-cross-architecture replay, and the Lean$\leftrightarrow$Rocq bridge.
-This is an estimate, not a commitment; the actual effort will depend on
-the complexity of the LLFree allocator's Iris model and the interaction
-between the CPS state-machine style and the Iris proofmode.
+core (Tier~2 of \S\ref{sec:verification_tiers}): ~1--2 years for the
+machine-interface Iris layer (the critical path), ~2--3 years for the
+kernel-function proofs (function by function, starting with
+\texttt{unmap\_range} and \texttt{shootdown\_broadcast}), and ~1--2
+years for iteration, cross-architecture replay, and the
+Lean$\leftrightarrow$Rocq bridge.  Tier~3 properties (scheduler
+fairness, multi-arch replay, personality correctness) are not included
+in this estimate; their effort is unbounded until the proof techniques
+mature.  This is an estimate, not a commitment; the actual effort will
+depend on the complexity of the LLFree allocator's Iris model and the
+interaction between the CPS state-machine style and the Iris proofmode.
 
 \subsection{How the Whitepaper Design Reduces Verification Surface}
 

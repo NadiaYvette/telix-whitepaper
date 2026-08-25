@@ -176,6 +176,59 @@ The relationship is best described as: Telix is a multikernel
 (\Barrelfish) of \emph{partial} framekernels (\Asterinas), where the
 framekernel is an optimisation layer rather than the whole TCB.
 
+\section{CHERIoT and OpenHarmony: Verification Peers}
+\label{sec:vs_cheriot_openeuler}
+
+Two additional systems occupy the formal-verification axis of the design
+space.
+
+\subsection{CHERIoT}
+
+CHERIoT \footcite{cheriot25sosp} is Microsoft's CHERI-enabled RTOS for
+32-bit embedded MCUs.  Its formal verification covers the
+\emph{hardware capability mechanism}: the CHERIoT-Ibex processor's
+unsealing, sealing, and revocation operations are proved observationally
+correct via the Ivory/CompCert toolchain \footcite{ros25fvc}.  This is
+ISA-level verification, not software-kernel verification.
+
+CHERIoT and Telix are complementary, not competing:
+
+\begin{itemize}
+  \item CHERIoT verifies the \emph{hardware} capability mechanism;
+    Telix verifies the \emph{software} memory-management algorithms.
+  \item CHERIoT targets embedded (32-bit MCU); Telix targets
+    general-purpose (64-bit server/desktop/IoT).
+  \item CHERIoT's verified hardware could eventually serve as the CHERI
+    boundary Telix describes as an ``additional boundary, not primary''
+    (\S\ref{sec:isolation_primitives}).
+\end{itemize}
+
+The CHERIoT result demonstrates that verified hardware capability
+mechanisms are practical at the embedded scale.  Telix benefits from
+this work when targeting CHERI-enabled hardware: the verified hardware
+would reduce the TCB that Telix's Tier~1--2 proofs must cover.
+
+\subsection{OpenHarmony LiteOS-M}
+
+OpenHarmony's LiteOS-M kernel --- a lightweight IoT microkernel --- was
+formally verified for functional correctness at FM~2026
+\footcite{zhao26fm}.  The verification used separation logic with
+Hoare logic triples, covered 17,000~lines of C, and discovered 17~bugs
+including memory-safety violations.
+
+The verified kernel is tiny and simple: no virtual memory, no SMP, no
+IOMMU.  Its verification scope corresponds to Tier~1 of
+\S\ref{sec:verification_tiers} for a sequential embedded kernel.
+Telix's verification target is orders of magnitude more complex
+(page clustering, weak memory, IOMMU, clustering).
+
+OpenHarmony is also one of Telix's \emph{personality targets}
+(\S\ref{sec:nextgen_abis}) --- Telix aims to provide OpenHarmony ABI
+compatibility, not to replace its verification.  The FM~2026 result
+demonstrates that industrial formal verification of embedded kernels is
+becoming practical, which bodes well for Telix's ambitions at a larger
+scale.
+
 \section{What Is Actually New}
 \label{sec:what_is_new}
 
