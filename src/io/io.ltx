@@ -10,9 +10,9 @@ syscall overhead, but introduce unnecessary latency and memory
 contention when used for intra-kernel communication where no privilege
 boundary exists.
 
-Telix resolves this via a unified, \textbf{purely asynchronous I/O model}. By
+The design resolves this via a unified, \textbf{purely asynchronous I/O model}. By
 fusing traditional capability ports with dynamically bound lock-free
-memory rings, Telix provides a single unified notification subsystem for
+memory rings, it provides a single unified notification subsystem for
 network, IPC, and storage events, ensuring cluster-wide extensibility
 without sacrificing local bare-metal throughput.
 

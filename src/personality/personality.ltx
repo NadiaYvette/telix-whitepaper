@@ -4,7 +4,7 @@
 \section{Dynamic Personality Redirection}
 
 To support foreign operating system Binaries (such as Linux ELF or
-Windows PE executables), Telix incorporates dynamic system call
+Windows PE executables), the design incorporates dynamic system call
 redirection tables \footcite{gerb01}. Foreign OS ABIs run atop
 user-level microkernel applications \footcite{golu91} backed by
 distributed \Mach-style cluster messaging
@@ -13,7 +13,7 @@ distributed \Mach-style cluster messaging
 \section{Native Completion-Based System Call API}
 
 To eliminate traditional trap-based system call overhead in the case of
-high-bandwidth system call issuance, Telix implements a memory-mapped
+high-bandwidth system call issuance, the design defines a memory-mapped
 submission and completion queue interface. This design builds upon the
 exception-less system call model introduced by FlexSC\footcite{soar10}
 and modern lock-free completion rings such as Linux \iouring

@@ -11,6 +11,26 @@ research, safe systems programming paradigms, and modern database memory
 management techniques to establish a scalable, general-purpose system
 architecture.
 
+\section*{Status and Reading Guide}
+
+Telix is a design proposal, not a description of a finished system.
+Throughout this document, present-tense statements about what
+Telix ``implements'', ``provides'', or ``does'' describe the
+\emph{proposed design}, not a running, verified implementation;
+wherever a mechanism already exists today---rather than being
+proposed---that is stated explicitly.
+
+A first-round prototype exists: an unverified monolithic kernel in
+the Telix repository that demonstrates a great deal of the design at
+small scale---page clustering, morsel allocation, copy-on-write fork,
+and the TLB shootdown protocol---but it remains below MVP, it is not
+verified, and it predates the framekernel\,/\,multikernel matryoshka
+redesign.  The verified implementation is being constructed
+incrementally as the second-round prototype
+(Chapter~\ref{ch:verification}), with the hardware-model proofs
+(\textsc{Tessera}) already complete and kernel-function proofs
+proceeding one function at a time.
+
 \section{Motivations}
 \label{sec:motivations}
 
