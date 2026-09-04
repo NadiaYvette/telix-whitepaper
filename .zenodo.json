@@ -2,7 +2,8 @@
   "title": "Telix Design Proposal",
   "creators": [
     {
-      "name": "Chambers, Nadia Yvette"
+      "name": "Chambers, Nadia Yvette",
+      "orcid": "0009-0009-7073-1726"
     }
   ],
   "description": "Design proposal for Telix, a research operating-system and toolchain architecture. The document covers the system design - memory, scheduling, filesystem, I/O, clustering, control plane, personality, and polyglot language integration (including a GHC cross-compilation target and a musl libc port) - together with an adversary model and TCB decomposition, isolation primitives, an explicit degradation path, a comparison against seven contemporary systems with the five claims held out as novel, and a three-tier structure for empirical validation (inherited evidence, the page-clustering performance hypothesis, and compositional burden). Claims without prototype evidence are labelled as hypotheses. Dual-licensed: recipients may take this work under EUPL-1.2 or CC BY 4.0, at their option.",
