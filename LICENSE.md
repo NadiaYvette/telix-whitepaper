@@ -36,7 +36,7 @@ appropriate credit.
 
 When you reuse or build upon this work, please attribute:
 
-> Nadia Chambers, "Telix Design Proposal" (2024–2026).
+> Nadia Yvette Chambers, "Telix Design Proposal" (2024–2026).
 > Licensed under EUPL‑1.2 or CC BY 4.0 (at your option).
 > Source: <https://git.sr.ht/~nadiayvette/telix-whitepaper>
 
